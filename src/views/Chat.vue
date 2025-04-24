@@ -3,7 +3,7 @@
     <div class="floating-particles"></div>
     <div class="rainbow-stripes"></div>
     <div class="top-right-icons">
-    <h1 style="margin-left:20px;">🤖 金融智能问答</h1>
+    <h1 style="margin-left:20px;">🤖 智能问答</h1>
     <div style="display: flex; align-items: right;">
         <el-button @click="refreshPage" type="text" style="width: 60px;background-color: transparent; border: none;"><el-icon style="font-size: 33px;color:#409EFF"><Refresh /></el-icon></el-button>
     <el-button @click="goHome" type="text" style="width: 60px; background-color: transparent; border: none;"><el-icon style="font-size: 30px;color:#409EFF"><HomeFilled /></el-icon></el-button>
