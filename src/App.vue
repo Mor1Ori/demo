@@ -4,12 +4,12 @@
     <!-- 左侧导航栏 -->
     <el-aside width="220px" style="background-color: #2D3A4B; color: white; z-index: 2;">
       
-      
+    <!--       
       <div style="padding: 20px; text-align: center;">
         <img src="/logo.png" alt="Logo" class="image">
         <h1 style="color: #fff; font-size: 30px;"> FinIntel系统</h1>
       </div>
-     
+    -->
       <el-menu :default-active="activeMenu" router>
         <el-menu-item index="/" class="menu-item">
           <el-icon><UploadFilled /></el-icon>
