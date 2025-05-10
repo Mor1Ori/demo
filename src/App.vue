@@ -3,14 +3,14 @@
   <el-container style="height: 100vh;margin: -6px; "  >
     <!-- 左侧导航栏 -->
     <el-aside width="220px" style="background-color: #2D3A4B; color: white; z-index: 2;">
-      
-    <!--       
+
+    <!--
       <div style="padding: 20px; text-align: center;">
         <img src="/logo.png" alt="Logo" class="image">
         <h1 style="color: #fff; font-size: 30px;"> FinIntel系统</h1>
       </div>
     -->
-      <el-menu :default-active="activeMenu" router>
+      <el-menu :default-active="activeMenu" router @select="handleMenuSelect">
         <el-menu-item index="/" class="menu-item">
           <el-icon><UploadFilled /></el-icon>
           <span>数据转化</span>
@@ -22,10 +22,25 @@
         </el-menu-item>
 
         <el-menu-item index="/chat" class="menu-item">
-          <span>💬 智能聊天</span>
+          <!-- 使用 el-icon 组件来包裹图标，确保一致性 -->
+          <el-icon><ChatDotRound /></el-icon>
+          <span>智能聊天</span>
         </el-menu-item>
+
+        <!-- 新增：数据预集成与操作 入口 -->
+        <el-menu-item index="/data-integration" class="menu-item">
+          <el-icon><Operation /></el-icon> <!-- 使用一个合适的图标 -->
+          <span>数据集预览与操作</span>
+        </el-menu-item>
+
+        <!-- 新增：JSON数据条目生成 入口 -->
+        <el-menu-item index="/json-generation" class="menu-item">
+          <el-icon><Tickets /></el-icon> <!-- 使用一个合适的图标 -->
+          <span>JSON条目生成</span>
+        </el-menu-item>
+
       </el-menu>
-      
+
     </el-aside>
 
     <!-- 内容区域 -->
@@ -37,19 +52,40 @@
 
 <script>
 import 'element-plus/dist/index.css';
-import { ElContainer, ElAside, ElMenu, ElMenuItem, ElMain } from 'element-plus';
-import { UploadFilled, Document, Message } from '@element-plus/icons-vue';
+import { ElContainer, ElAside, ElMenu, ElMenuItem, ElMain, ElIcon } from 'element-plus';
+// 确保导入所有需要的图标
+import { UploadFilled, Document, ChatDotRound, Operation, Tickets } from '@element-plus/icons-vue';
 
 export default {
   name: 'App',
   components: {
-    ElContainer, ElAside, ElMenu, ElMenuItem, ElMain,
-    UploadFilled, Document,Message
+    ElContainer, ElAside, ElMenu, ElMenuItem, ElMain, ElIcon, // 添加 ElIcon
+    // 显式列出所有使用的图标组件
+    UploadFilled, Document, ChatDotRound, Operation, Tickets
   },
   data() {
     return {
-      activeMenu: '/'
+      // activeMenu 会由 vue-router 根据当前路径自动更新，如果 el-menu 的 router 属性为 true
+      // 但为了保险起见，或者如果需要手动控制，可以监听路由变化来更新
+      activeMenu: this.$route.path
     };
+  },
+  watch: {
+    // 监听路由变化，更新 activeMenu
+    '$route'(to, from) {
+      this.activeMenu = to.path;
+    }
+  },
+  methods: {
+    handleMenuSelect(index) {
+      // 当启用 router 模式时，el-menu 会自动处理导航，
+      // 但如果需要，可以在这里更新 activeMenu 或执行其他逻辑
+      this.activeMenu = index;
+    }
+  },
+  mounted() {
+    // 初始化 activeMenu 为当前路径
+    this.activeMenu = this.$route.path;
   }
 };
 </script>
@@ -68,8 +104,26 @@ export default {
   font-size: 16px;
   width: 220px;
   height: 65px;
-  border-top: 0.5px solid white;
+  border-top: 0.5px solid white; /* 上边框 */
+  /* 添加下边框，使每个item都有上下边框，最后一个item的下边框由el-menu自身处理或不处理 */
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.1); /* 下边框，颜色可以调整 */
+  box-sizing: border-box; /*确保padding和border不增加元素总宽高 */
 }
+
+/* 移除第一个菜单项的上边框，或最后一个菜单项的下边框（如果需要） */
+.el-menu-item:first-child {
+  border-top: none; /* 或者设为与背景色一致的边框 */
+}
+/* 确保菜单项内的图标和文字垂直居中 */
+.el-menu-item .el-icon {
+  margin-right: 10px; /* 图标和文字间距 */
+  font-size: 18px; /* 调整图标大小 */
+}
+.el-menu-item span {
+  vertical-align: middle;
+}
+
+
 .el-menu-item:hover {
   background-color: #5C6B75;  /* hover 状态使用较深灰蓝色 */
   color: #E6F0F3;  /* 浅色文字 */
