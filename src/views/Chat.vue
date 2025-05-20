@@ -771,7 +771,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 15px;
-  overflow-y: auto; /* Allow scrolling if content overflows */
+  overflow-y: hidden; /* Allow scrolling if content overflows */
 }
 .config-card {
   border: 1px solid #e0e0e0;

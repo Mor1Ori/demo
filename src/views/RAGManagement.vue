@@ -97,8 +97,15 @@
 </template>
 
 <script>
-import { ElCard, ElUpload, ElButton, ElTable, ElTableColumn, ElPagination, ElMessage, ElMessageBox } from 'element-plus';
-import { UploadFilled, DeleteFilled, Search,House,Refresh,RemoveFilled, HomeFilled} from '@element-plus/icons-vue';
+import {
+  ElCard,  ElUpload,  ElButton,  ElTable,  ElTableColumn,  ElPagination,  ElMessage,  ElMessageBox,  ElLoading  
+} from 'element-plus';
+import {
+  UploadFilled,  DeleteFilled,  Search,  Refresh,  RemoveFilled,  HomeFilled
+} from '@element-plus/icons-vue';
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:5000'; // <<--- 修改
 
 export default {
   name: 'RAGManagement',
@@ -107,7 +114,7 @@ export default {
   },
   data() {
     return {
-      documents: [
+      documents: [  // 表格数据，应包含 fileId
       { name: '财报分析.pdf', type: 'pdf', date: '2025-03-19 10:30:45' ,note: 'A'},
         { name: '公司年报.docx', type: 'docx', date: '2025-03-18 14:22:31', note: 'A'},
         { name: '市场调研.csv', type: 'csv', date: '2025-03-17 09:10:12' , note: 'A'},
@@ -124,6 +131,7 @@ export default {
       ],
       currentPage: 1,
       searchQuery: '',
+      isLoadingTable: false,
       currentTime: new Date().toLocaleTimeString()
     };
   },
@@ -149,46 +157,118 @@ export default {
     goHome() {
       this.$router.push('/');
     },
-    addDocument(file) {
-      const newDoc = {
-        name: file.name,
-        type: file.name.split('.').pop(),
-        date: new Date().toLocaleString(),
-        note: 'A'
-      };
-      this.documents.push(newDoc);
-      ElMessage.success(`文件已添加：${file.name}`);
-    },
-    deleteDocument(index) {
-      ElMessageBox.confirm(
-        '你确定要删除这个文件吗？',
-        '确认删除',
-        {
-          type: 'warning'
+    async addDocument(uploadFile, type = 'document') { // type: 'document' or 'database'
+      this.isLoadingTable = true;
+      const loadingInstance = ElLoading.service({ text: '正在上传文件...' });
+      try {
+        const formData = new FormData();
+        formData.append('file', uploadFile.raw);
+
+        let url = '';
+        if (type === 'document') {
+          url = `${API_BASE_URL}/rag-management/upload-document`;
+          // API 2.1 有 description 参数，如果需要，从前端获取
+          // formData.append('description', '用户提供的描述');
+        } else { // database
+          url = `${API_BASE_URL}/rag-management/upload-database`;
         }
-      ).then(() => {
-        this.documents.splice(index, 1);
-        ElMessage.success('文件已删除');
-      }).catch(() => {
-        ElMessage.info('操作已取消');
-      });
-    },
-    clearAllDocuments() {
-      ElMessageBox.confirm(
-        '你确定要清空所有文件吗？',
-        '确认清空',
-        {
-          type: 'warning'
+
+        const response = await axios.post(url, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        if (response.data.status === 'success') {
+          ElMessage.success(response.data.message);
+          // 后端返回 fileId 或 databaseId，需要将其添加到 documents 列表中
+          // 为了简化，这里我们调用一次搜索（如果文件名已知）或提示用户刷新
+          // 更好的做法是后端返回完整的文件信息，前端直接添加
+          this.searchDocuments(uploadFile.name); // 尝试搜索刚上传的文件来更新列表
+        } else {
+          ElMessage.error(response.data.message || '文件上传失败');
         }
-      ).then(() => {
+      } catch (error) {
+        ElMessage.error('文件上传请求失败: ' + error.message);
+      } finally {
+        this.isLoadingTable = false;
+        loadingInstance.close();
+      }
+    },
+    async searchDocuments(query = this.searchQuery) { // query 参数允许内部调用
+      this.isLoadingTable = true;
+      const loadingInstance = ElLoading.service({ text: '正在搜索...' });
+      try {
+        // API 2.3: 如果 filename 为空，后端是否返回所有文件？需要确认
+        const response = await axios.get(`${API_BASE_URL}/rag-management/search`, {
+          params: { filename: query.trim() }
+        });
+        if (response.data.status === 'success') {
+          this.documents = response.data.results.map(doc => ({
+            id: doc.fileId, // 使用 fileId 作为唯一标识
+            name: doc.filename,
+            // type: doc.filename.split('.').pop(), // 从文件名推断类型
+            date: new Date(doc.uploadDate).toLocaleString(), // 格式化日期
+            // note: doc.description || '', // 如果有描述
+          }));
+          ElMessage.success(`搜索到 ${this.documents.length} 个文件`);
+        } else {
+          this.documents = [];
+          ElMessage.error(response.data.message || '搜索失败');
+        }
+      } catch (error) {
         this.documents = [];
-        ElMessage.success('所有文件已清空');
-      }).catch(() => {
-        ElMessage.info('操作已取消');
-      });
+        ElMessage.error('搜索请求失败: ' + error.message);
+      } finally {
+        this.isLoadingTable = false;
+        loadingInstance.close();
+      }
+    },
+    async deleteDocument(fileId, fileName) { // 需要 fileId
+      try {
+        await ElMessageBox.confirm(`你确定要删除文件 "${fileName}" 吗？`, '确认删除', { type: 'warning' });
+        this.isLoadingTable = true;
+        const loadingInstance = ElLoading.service({ text: '正在删除...' });
+        try {
+          const response = await axios.delete(`${API_BASE_URL}/rag-management/delete-file/${fileId}`);
+          if (response.data.status === 'success') {
+            ElMessage.success(response.data.message);
+            // 从前端列表中移除
+            this.documents = this.documents.filter(doc => doc.id !== fileId);
+          } else {
+            ElMessage.error(response.data.message || '删除失败');
+          }
+        } finally {
+          this.isLoadingTable = false;
+          loadingInstance.close();
+        }
+      } catch (e) {
+        if (e !== 'cancel') ElMessage.info('操作已取消');
+      }
+    },
+
+    async clearAllDocuments() {
+      try {
+        await ElMessageBox.confirm('你确定要清空所有文件吗？这将无法恢复！', '确认清空', { type: 'warning' });
+        this.isLoadingTable = true;
+        const loadingInstance = ElLoading.service({ text: '正在清空...' });
+        try {
+          const response = await axios.delete(`${API_BASE_URL}/rag-management/delete-all`);
+          if (response.data.status === 'success') {
+            ElMessage.success(response.data.message);
+            this.documents = [];
+          } else {
+            ElMessage.error(response.data.message || '清空失败');
+          }
+        } finally {
+          this.isLoadingTable = false;
+          loadingInstance.close();
+        }
+      } catch (e) {
+        if (e !== 'cancel') ElMessage.info('操作已取消');
+      }
     }
   },
   mounted() {
+    this.searchDocuments(''); // 页面加载时尝试获取所有文件（如果API支持filename为空）
     setInterval(() => {
       this.currentTime = new Date().toLocaleTimeString();
     }, 1000);

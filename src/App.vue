@@ -49,8 +49,87 @@
     </el-main>
   </el-container>
 </template>
-
 <script>
+import 'element-plus/dist/index.css';
+import { ElContainer, ElAside, ElMenu, ElMenuItem, ElMain, ElIcon, ElMessage, ElLoading } from 'element-plus';
+import { UploadFilled, Document, ChatDotRound, Operation, Tickets } from '@element-plus/icons-vue';
+import axios from 'axios'; // 引入axios
+
+// 后端API根地址
+const API_BASE_URL = 'http://localhost:5000'; // <<--- 修改为你后端API的实际地址
+
+export default {
+  name: 'App',
+  components: {
+    ElContainer, ElAside, ElMenu, ElMenuItem, ElMain, ElIcon,
+    UploadFilled, Document, ChatDotRound, Operation, Tickets
+  },
+  data() {
+    return {
+      activeMenu: this.$route.path,
+      systemStatus: { // 用于存储从 / API 获取的状态
+        isReady: false,
+        ollamaModels: [],
+        lowMemory: false,
+        message: ''
+      },
+      isLoadingSystem: true, // 控制全局加载动画
+    };
+  },
+  watch: {
+    '$route'(to) {
+      this.activeMenu = to.path;
+    }
+  },
+  methods: {
+    handleMenuSelect(index) {
+      this.activeMenu = index;
+    },
+    async initializeSystem() {
+      const loadingInstance = ElLoading.service({
+        lock: true,
+        text: '正在初始化系统，请稍候...',
+        background: 'rgba(0, 0, 0, 0.7)',
+      });
+      this.isLoadingSystem = true;
+      try {
+        const response = await axios.get(`${API_BASE_URL}/`);
+        const data = response.data;
+        this.systemStatus.isReady = data.is_ready;
+        this.systemStatus.ollamaModels = data.ollama_models || [];
+        this.systemStatus.lowMemory = data.low_memory || false;
+        this.systemStatus.message = data.message || '';
+
+        if (data.is_ready) {
+          ElMessage.success('系统初始化成功！');
+          if (data.low_memory) {
+            ElMessage.warning(`系统提示: ${data.message || '内存可能不足，请注意系统性能。'}`);
+          }
+          // 将ollama模型列表存储到全局状态或 localStorage，供其他页面使用
+          // 简单起见，这里可以用 localStorage
+          localStorage.setItem('ollama_models', JSON.stringify(this.systemStatus.ollamaModels));
+        } else {
+          ElMessage.error(`系统初始化失败: ${data.message || '未知错误'}`);
+        }
+      } catch (error) {
+        console.error("System initialization error:", error);
+        ElMessage.error('无法连接到后端服务或初始化失败，请检查后端服务是否运行。');
+        this.systemStatus.message = '无法连接到后端服务或初始化失败。';
+      } finally {
+        this.isLoadingSystem = false;
+        loadingInstance.close();
+      }
+    }
+  },
+  created() { // 改为 created，确保在路由解析前或同时执行
+    this.initializeSystem();
+  },
+  mounted() {
+    this.activeMenu = this.$route.path;
+  }
+};
+</script>
+<!-- <script>
 import 'element-plus/dist/index.css';
 import { ElContainer, ElAside, ElMenu, ElMenuItem, ElMain, ElIcon } from 'element-plus';
 // 确保导入所有需要的图标
@@ -88,7 +167,7 @@ export default {
     this.activeMenu = this.$route.path;
   }
 };
-</script>
+</script> -->
 
 <style>
  .image {
