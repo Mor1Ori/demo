@@ -45,7 +45,6 @@
             </li>
           </ul>
           <div v-else class="empty-conversations">
-            (这里显示许多对话组，在访问该页面/chat/的时候就获取到每个对话组的id和title)
             <br/> 点击“新建对话”开始。
           </div>
         </div>
@@ -56,7 +55,6 @@
         <div class="chat-window-wrapper">
           <div class="chat-window" ref="chatWindow">
             <div v-if="!activeConversationMessages || activeConversationMessages.length === 0" class="empty-chat-placeholder">
-              (在点击左侧某个对话组之后，向后端获取到该对话组里的历史对话内容，以GPT页面那种对话的形式显示在这里)
             </div>
             <div v-for="message in activeConversationMessages" :key="message.id" :class="message.sender === 'user' ? 'user-message' : 'ai-message'">
               <div class="message-bubble">
@@ -103,8 +101,8 @@
           <div class="config-item">
             <label>选择模型</label>
             <el-select v-model="selectedRemoteModel" placeholder="下拉选择模型" style="width:100%;">
-              <el-option label="模型A (DeepSeek V2)" value="model_a"></el-option>
-              <el-option label="模型B (GPT-4)" value="model_b"></el-option>
+              <el-option label="DeepSeek V2" value="DeepSeek V2"></el-option>
+              <el-option label="GPT-4" value="GPT-4"></el-option>
             </el-select>
             <el-button type="success" size="small" @click="loadRemoteModel" class="config-button">加载模型</el-button>
           </div>
@@ -133,8 +131,9 @@
 </template>
 
 <script>
-import { Refresh, HomeFilled, Promotion, Plus, Edit, Delete } from '@element-plus/icons-vue'; // Added Plus, Edit, Delete
+import { Refresh, HomeFilled, Promotion, Plus, Edit, Delete } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import axios from 'axios';
 
 export default {
   name: 'ChatPage',
@@ -144,24 +143,16 @@ export default {
   data() {
     return {
       userInput: '',
-      conversations: [], // Will be loaded from localStorage or API
-      activeConversationIndex: -1, // No active conversation initially
+      conversations: [], // [{ id: string, name: string, messages: [{ id, sender, text, timestamp, think?, sources? }] }]
+      activeConversationIndex: -1,
       currentTime: new Date().toLocaleTimeString(),
-      currentModelApiInfo: 'DeepSeek API v1.0', // Example
-      
-      // Right panel config
+      currentModelApiInfo: '',
       selectedRemoteModel: '',
       apiEndpoint: '',
       localModelPath: '',
-
-      // Bottom controls
       enableHistory: true,
       showModelThinking: false,
       showRagReference: false,
-
-      // Mock data (will be replaced by actual API calls)
-      mockAiResponses: [ /* ... your existing mock responses ... */ ],
-      mockUserQuestions: [ /* ... your existing mock user questions ... */ ],
     };
   },
   computed: {
@@ -173,62 +164,139 @@ export default {
     }
   },
   methods: {
-    refreshPage() { location.reload(); },
-    goHome() { this.$router.push('/'); },
+    // Utility to generate UUID for temporary chatId
+    generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    },
 
+    // Fetch conversation list (3.1: GET /chat)
     async fetchConversations() {
-      // TODO: Replace with API call to fetch conversation list (id, name/title)
-      // For now, load from localStorage or initialize
-      const storedConversations = localStorage.getItem('chat_conversations_v2');
-      if (storedConversations) {
-        this.conversations = JSON.parse(storedConversations);
-        if (this.conversations.length > 0) {
-          this.activeConversationIndex = 0; // Select first one by default
-          // TODO: Optionally fetch messages for the first active conversation here
+      try {
+        const response = await axios.get('/chat');
+        const { Success, chats } = response.data;
+
+        if (!Success) {
+          throw new Error('获取对话列表失败');
         }
-      } else {
-        // Initialize with a sample if none found
-        this.conversations = [
-          // { id: 'conv1', name: '对话一', messages: [] },
-          // { id: 'conv2', name: '对话二', messages: [] }
-        ];
-        this.activeConversationIndex = -1;
+
+        this.conversations = chats.map(chat => ({
+          id: chat.chatId,
+          name: chat.title,
+          messages: []
+        }));
+
+        if (this.conversations.length > 0) {
+          this.activeConversationIndex = 0;
+          await this.fetchMessagesForConversation(0);
+        } else {
+          this.activeConversationIndex = -1;
+        }
+
+        this.saveConversationsToStorage();
+      } catch (error) {
+        ElMessage.error(`获取对话列表失败: ${error.message}`);
+        const storedConversations = localStorage.getItem('chat_conversations_v2');
+        if (storedConversations) {
+          this.conversations = JSON.parse(storedConversations);
+          if (this.conversations.length > 0) {
+            this.activeConversationIndex = 0;
+            await this.fetchMessagesForConversation(0);
+          }
+        } else {
+          this.conversations = [];
+          this.activeConversationIndex = -1;
+        }
       }
-      // Simulate fetching current model/api info
-      // this.currentModelApiInfo = await fetchModelInfoFromApi();
     },
 
+    // Fetch conversation history (3.4: GET /chat/history)
     async fetchMessagesForConversation(convIndex) {
-      // TODO: API call to fetch messages for conversations[convIndex].id
-      // For now, if messages are already part of the conv object (e.g., from localStorage)
-      // this function might just ensure the UI updates or handle lazy loading.
-      ElMessage.info(`加载对话 "${this.conversations[convIndex].name}" 的消息... (模拟)`);
-      // Simulate delay
-      await new Promise(resolve => setTimeout(resolve, 300));
-      // If messages were not pre-loaded, you'd populate them here.
-      // Example: this.conversations[convIndex].messages = await fetchMessagesApi(this.conversations[convIndex].id);
-      this.scrollToBottom();
+      if (convIndex < 0 || !this.conversations[convIndex]) return;
+      try {
+        const conv = this.conversations[convIndex];
+        const response = await axios.get('/chat/history', {
+          params: {
+            chatId: conv.id,
+            title: conv.name
+          }
+        });
+        const { success, history } = response.data;
+
+        if (!success) {
+          throw new Error('获取对话历史失败');
+        }
+
+        this.conversations[convIndex].messages = history.flatMap(item => [
+          {
+            id: item.id,
+            sender: 'user',
+            text: item.question,
+            timestamp: item.timestamp
+          },
+          {
+            id: `${item.id}_ai`,
+            sender: 'ai',
+            text: item.answer,
+            timestamp: item.timestamp
+          }
+        ]);
+
+        this.saveConversationsToStorage();
+        ElMessage.success(`已加载对话 "${conv.name}" 的历史消息`);
+        this.scrollToBottom();
+      } catch (error) {
+        ElMessage.error(`加载对话历史失败: ${error.message}`);
+        this.conversations[convIndex].messages = [];
+      }
     },
 
-    saveConversationsToStorage() {
-      localStorage.setItem('chat_conversations_v2', JSON.stringify(this.conversations));
+    // Create new conversation (3.2: POST /chat/create)
+    async createNewConversation() {
+      try {
+        const { value } = await ElMessageBox.prompt('请输入对话名称:', '新建对话', {
+          confirmButtonText: '创建',
+          cancelButtonText: '取消',
+          inputValue: `新对话 ${this.conversations.length + 1}`,
+          inputValidator: (val) => val && val.trim() !== '' ? true : '对话名称不能为空',
+        });
+
+        const newConvTitle = value.trim();
+        const tempChatId = this.generateUUID();
+
+        const response = await axios.post('/chat/create', {
+          chatId: tempChatId,
+          title: newConvTitle
+        });
+
+        const { success, chatId, message } = response.data;
+        if (!success) {
+          throw new Error(message || '创建对话失败');
+        }
+
+        const newConv = {
+          id: chatId,
+          name: newConvTitle,
+          messages: []
+        };
+
+        this.conversations.push(newConv);
+        this.activeConversationIndex = this.conversations.length - 1;
+        this.saveConversationsToStorage();
+        ElMessage.success(`已创建对话 "${newConvTitle}"`);
+        this.userInput = '';
+        this.scrollToBottom();
+      } catch (error) {
+        if (error !== 'cancel') {
+          ElMessage.error(`创建对话失败: ${error.message}`);
+        }
+      }
     },
 
-    createNewConversation() {
-      // TODO: API call to create a new conversation on the backend, get its ID
-      const newConvId = `conv_${Date.now()}`; // Temporary local ID
-      const newConvName = `新对话 ${this.conversations.length + 1}`;
-      const newConv = { id: newConvId, name: newConvName, messages: [] };
-      
-      this.conversations.push(newConv);
-      this.activeConversationIndex = this.conversations.length - 1;
-      this.saveConversationsToStorage();
-      ElMessage.success(`已创建 "${newConvName}"`);
-      // this.simulateInitialChat(newConvId); // Optionally simulate some initial messages
-      this.userInput = ''; // Clear input for new chat
-      this.scrollToBottom();
-    },
-
+    // Rename conversation (3.5: PATCH /chat/update)
     async renameConversation(index) {
       const conversation = this.conversations[index];
       try {
@@ -238,18 +306,31 @@ export default {
           inputValue: conversation.name,
           inputValidator: (val) => val && val.trim() !== '' ? true : '名称不能为空',
         });
-        if (value && value.trim() !== conversation.name) {
-          // TODO: API call to update conversation name on backend
-          // await updateConversationNameApi(conversation.id, value.trim());
-          this.conversations[index].name = value.trim();
+
+        const newName = value.trim();
+        if (newName !== conversation.name) {
+          const response = await axios.patch('/chat/update', {
+            chatId: conversation.id,
+            title: newName
+          });
+
+          const { success, message } = response.data;
+          if (!success) {
+            throw new Error(message || '修改对话名称失败');
+          }
+
+          this.conversations[index].name = newName;
           this.saveConversationsToStorage();
           ElMessage.success('对话名称已修改!');
         }
-      } catch (e) {
-        if (e !== 'cancel') ElMessage.error('修改名称失败: ' + e);
+      } catch (error) {
+        if (error !== 'cancel') {
+          ElMessage.error(`修改对话名称失败: ${error.message}`);
+        }
       }
     },
 
+    // Delete conversation (3.3: DELETE /chat/delete)
     async deleteConversation(index) {
       const conversation = this.conversations[index];
       try {
@@ -258,92 +339,172 @@ export default {
           cancelButtonText: '取消',
           type: 'warning',
         });
-        // TODO: API call to delete conversation on backend
-        // await deleteConversationApi(conversation.id);
+
+        const response = await axios.delete('/chat/delete', {
+          data: {
+            chatId: conversation.id,
+            title: conversation.name
+          }
+        });
+
+        const { success, message } = response.data;
+        if (!success) {
+          throw new Error(message || '删除对话失败');
+        }
+
         this.conversations.splice(index, 1);
         if (this.activeConversationIndex === index) {
-            this.activeConversationIndex = this.conversations.length > 0 ? 0 : -1;
-            if (this.activeConversationIndex !== -1) {
-                this.fetchMessagesForConversation(this.activeConversationIndex);
-            }
+          this.activeConversationIndex = this.conversations.length > 0 ? 0 : -1;
+          if (this.activeConversationIndex !== -1) {
+            await this.fetchMessagesForConversation(this.activeConversationIndex);
+          }
         } else if (this.activeConversationIndex > index) {
-            this.activeConversationIndex--;
+          this.activeConversationIndex--;
         }
+
         this.saveConversationsToStorage();
         ElMessage.success('对话已删除!');
-      } catch (e) {
-        if (e !== 'cancel') ElMessage.error('删除失败: ' + e);
+      } catch (error) {
+        if (error !== 'cancel') {
+          ElMessage.error(`删除对话失败: ${error.message}`);
+        }
       }
     },
 
-    switchConversation(index) {
-      if (this.activeConversationIndex !== index) {
-        this.activeConversationIndex = index;
-        this.fetchMessagesForConversation(index); // Fetch/display messages for the new active conversation
-      }
-    },
-
+    // Send message (3.7: POST /chat/send)
     async sendMessage() {
-      if (!this.userInput.trim() || this.activeConversationIndex < 0) return;
+      if (!this.userInput.trim() || this.activeConversationIndex < 0) {
+        ElMessage.warning('请先选择一个对话或输入消息');
+        return;
+      }
 
       const userMessageText = this.userInput.trim();
       const currentConv = this.conversations[this.activeConversationIndex];
 
-      const userMessage = { id: `msg_${Date.now()}_user`, sender: 'user', text: userMessageText };
+      const userMessage = {
+        id: `msg_${Date.now()}_user`,
+        sender: 'user',
+        text: userMessageText,
+        timestamp: new Date().toISOString()
+      };
       currentConv.messages.push(userMessage);
       this.userInput = '';
       this.scrollToBottom();
 
-      // TODO: API call to send message to backend and get AI response
-      // const aiResponseText = await getAiReplyFromApi(currentConv.id, userMessageText, this.enableHistory);
-      // Simulate AI response
-      const aiResponseText = `模拟回复针对："${userMessageText}". 当前启用历史: ${this.enableHistory}, 显示思考: ${this.showModelThinking}, RAG参考: ${this.showRagReference}.`;
-      await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000)); // Simulate network delay
+      try {
+        const response = await axios.post('/chat/send', {
+          chatId: currentConv.id,
+          title: currentConv.name,
+          use_conversation_history: this.enableHistory,
+          question: userMessageText,
+          is_think: this.showModelThinking,
+          show_sources: this.showRagReference
+        });
 
-      const aiMessage = { id: `msg_${Date.now()}_ai`, sender: 'ai', text: aiResponseText };
-      currentConv.messages.push(aiMessage);
-      
-      this.saveConversationsToStorage();
-      this.scrollToBottom();
-    },
-
-    scrollToBottom() {
-      this.$nextTick(() => {
-        const chatWindow = this.$refs.chatWindow;
-        if (chatWindow) {
-          chatWindow.scrollTop = chatWindow.scrollHeight;
+        const { success, response: aiResponseText, think, sources } = response.data;
+        if (!success) {
+          throw new Error('消息发送失败');
         }
-      });
+
+        const aiMessage = {
+          id: `msg_${Date.now()}_ai`,
+          sender: 'ai',
+          text: aiResponseText,
+          timestamp: new Date().toISOString(),
+          think: this.showModelThinking ? think : null,
+          sources: this.showRagReference ? sources : null
+        };
+        currentConv.messages.push(aiMessage);
+
+        this.saveConversationsToStorage();
+        this.scrollToBottom();
+      } catch (error) {
+        ElMessage.error(`消息发送失败: ${error.message}`);
+        // Remove the user message if the API call fails
+        currentConv.messages.pop();
+        this.scrollToBottom();
+      }
     },
 
-    // Right panel methods (mostly placeholders)
-    loadRemoteModel() {
+    // Load remote model (3.6: POST /chat/load_model with model_type: ollama)
+    async loadRemoteModel() {
       if (!this.selectedRemoteModel) {
         ElMessage.warning('请先选择一个模型');
         return;
       }
-      // TODO: API call to load this.selectedRemoteModel
-      ElMessage.info(`正在加载模型: ${this.selectedRemoteModel}... (模拟)`);
-      this.currentModelApiInfo = `模型: ${this.selectedRemoteModel} (模拟加载)`;
+      try {
+        const response = await axios.post('/chat/load_model', {
+          model_type: 'ollama',
+          model_name: this.selectedRemoteModel,
+          model_path: '',
+          api: ''
+        });
+
+        const { success, message } = response.data;
+        if (!success) {
+          throw new Error(message || '模型加载失败');
+        }
+
+        this.currentModelApiInfo = `模型: ${this.selectedRemoteModel} (已加载)`;
+        ElMessage.success('模型加载成功!');
+      } catch (error) {
+        ElMessage.error(`模型加载失败: ${error.message}`);
+      }
     },
-    loadApi() {
+
+    // Load API (3.6: POST /chat/load_model with model_type: api)
+    async loadApi() {
       if (!this.apiEndpoint.trim()) {
         ElMessage.warning('请输入API端点');
         return;
       }
-      // TODO: Logic to validate and use this.apiEndpoint
-      ElMessage.info(`尝试加载API: ${this.apiEndpoint}... (模拟)`);
-      this.currentModelApiInfo = `API: ${this.apiEndpoint} (模拟加载)`;
+      try {
+        const response = await axios.post('/chat/load_model', {
+          model_type: 'api',
+          model_name: '',
+          model_path: '',
+          api: this.apiEndpoint
+        });
+
+        const { success, message } = response.data;
+        if (!success) {
+          throw new Error(message || 'API加载失败');
+        }
+
+        this.currentModelApiInfo = `API: ${this.apiEndpoint} (已加载)`;
+        ElMessage.success('API加载成功!');
+      } catch (error) {
+        ElMessage.error(`API加载失败: ${error.message}`);
+      }
     },
-    selectLocalModelPath() {
-      // This requires either a native file dialog (e.g., via Electron)
-      // or a server-side file browser if running in a web context with server access.
-      // For a pure web app, direct folder selection is not possible due to browser security.
-      // You might use <input type="file" webkitdirectory directory multiple /> but support varies.
-      ElMessage.info('选择本地模型文件夹功能需要特定环境支持 (如Electron或服务器端配合)。');
-      // Simulate path selection for UI
-      this.localModelPath = "/path/to/your/safetensors/model (模拟)";
+
+    // Load local safetensors model (3.6: POST /chat/load_model with model_type: safetensors)
+    async selectLocalModelPath() {
+      if (!this.localModelPath) {
+        ElMessage.warning('请先选择模型文件夹路径');
+        return;
+      }
+      try {
+        const response = await axios.post('/chat/load_model', {
+          model_type: 'safetensors',
+          model_name: '',
+          model_path: this.localModelPath,
+          api: ''
+        });
+
+        const { success, message } = response.data;
+        if (!success) {
+          throw new Error(message || '本地模型加载失败');
+        }
+
+        this.currentModelApiInfo = `本地模型: ${this.localModelPath} (已加载)`;
+        ElMessage.success('本地模型加载成功!');
+      } catch (error) {
+        ElMessage.error(`本地模型加载失败: ${error.message}`);
+      }
     },
+
+    // Export conversation history (3.8)
     exportConversationHistory() {
       if (this.activeConversationIndex < 0 || !this.conversations[this.activeConversationIndex]) {
         ElMessage.warning('没有活动的对话可以导出。');
@@ -362,19 +523,25 @@ export default {
       URL.revokeObjectURL(url);
       ElMessage.success('对话历史已导出为JSON!');
     },
-    
-    // Simulate initial chat for new conversations (from your old code)
-    // simulateInitialChat(convId) {
-    //   const convIndex = this.conversations.findIndex(c => c.id === convId);
-    //   if (convIndex === -1) return;
-    //   for (let i = 0; i < this.mockUserQuestions.length; i++) {
-    //     this.conversations[convIndex].messages.push({ id: Date.now() + i, sender: 'user', text: this.mockUserQuestions[i] });
-    //     this.conversations[convIndex].messages.push({ id: Date.now() + i + 1000, sender: 'ai', text: this.mockAiResponses[i] });
-    //   }
-    //   this.saveConversationsToStorage();
-    //   this.scrollToBottom();
-    // }
 
+    // Scroll to bottom of chat window
+    scrollToBottom() {
+      this.$nextTick(() => {
+        const chatWindow = this.$refs.chatWindow;
+        if (chatWindow) {
+          chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+      });
+    },
+
+    // Save conversations to local storage
+    saveConversationsToStorage() {
+      localStorage.setItem('chat_conversations_v2', JSON.stringify(this.conversations));
+    },
+
+    // Navigation methods
+    refreshPage() { location.reload(); },
+    goHome() { this.$router.push('/'); }
   },
   mounted() {
     this.fetchConversations();
@@ -389,6 +556,25 @@ export default {
 </script>
 
 <style scoped>
+.message-think {
+  font-size: 12px;
+  color: #555;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.message-sources {
+  font-size: 12px;
+  color: #718096;
+  margin-top: 4px;
+}
+
+.message-timestamp {
+  font-size: 12px;
+  color: #718096;
+  margin-top: 4px;
+}
+
 .chat-page-wrapper {
   display: flex;
   flex-direction: column;

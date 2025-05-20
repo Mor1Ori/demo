@@ -44,7 +44,7 @@
     </el-aside>
 
     <!-- 内容区域 -->
-    <el-main>
+    <el-main style="overflow-y: hidden;">
       <router-view></router-view>
     </el-main>
   </el-container>
