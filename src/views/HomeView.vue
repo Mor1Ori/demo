@@ -71,8 +71,13 @@
 </template>
 
 <script>
+import axios from 'axios';
+import { ElMessage, ElLoading } from 'element-plus';
 import { ElCard, ElUpload, ElSelect, ElOption, ElInput, ElButton, ElTable, ElTableColumn } from 'element-plus';
 import { UploadFilled, DeleteFilled, Search,House,Refresh,List,HomeFilled} from '@element-plus/icons-vue';
+
+const API_BASE_URL = 'http://localhost:5000'; // <<--- 修改成后端url
+
 export default {
   name: 'DataConversion',
   components: {
@@ -80,8 +85,12 @@ export default {
   },
   data() {
     return {
-      selectedScene: 'qa',  // 选择场景
-      outputFileName: '',   // 转化后的文件名
+      selectedScene: '智能问答', // 对应 API 1.2 scene
+      outputFileName: '',     // 对应 API 1.1 inputData (作为输出文件名)
+      uploadedFile: null,     // 用于 API 1.2 的文件对象
+      ollamaModels: [],       // Ollama模型列表
+      selectedOllamaModel: '',// 用户选择的Ollama模型
+      isLoading: false,
       currentTime: new Date().toLocaleTimeString(),
       convertedFiles: [
         {name:'aaa.txt',scene:'欺诈检测',date:'2025-03-19 10:30:45'},
@@ -90,37 +99,111 @@ export default {
         {name:'欺诈事件.txt',scene:'欺诈检测',date:'2025-03-19 10:30:45'},
         {name:'金融案例.csv.',scene:'智能问答',date:'2025-03-19 10:30:45'},
         {name:'金融论文.pdf',scene:'合规检测',date:'2025-03-19 10:30:45'},
-      ],   // 已转化的文件列表
+      ],   // 已转化的文件列表，表格数据
     };
   },
   methods: {
-    handleFileUpload(file) {
-      alert(`文件已上传：${file.name}`);
-    },
+    // handleFileUpload(file) {
+    //   alert(`文件已上传：${file.name}`);
+    // },
     refreshPage() {
       location.reload();
     },
     goHome() {
       this.$router.push('/');
     },
-    convertData() {
-      if (!this.outputFileName) {
-        alert("请输入转化后的文件名");
+
+    // 新增的方法：
+    handleFileUploadForConversion(uploadFile) {
+      this.uploadedFile = uploadFile.raw; // 获取原始文件对象
+    },
+
+    async convertDataSimple() { // 对应 API 1.1 (如果适用，API描述不清晰)
+      if (!this.outputFileName.trim()) {
+        ElMessage.error('请输入转化后的文件名');
         return;
       }
+      this.isLoading = true;
+      const loadingInstance = ElLoading.service({ text: '正在转化...' });
+      try {
+        const payload = {
+          inputData: this.outputFileName, // API 文档中是 "转化后的文件名"
+          conversionType: "text_processing_example" // API 1.1 的 conversionType 需要明确
+        };
+        const response = await axios.post(`${API_BASE_URL}/convert`, payload);
+        if (response.data.success) {
+          this.convertedFiles.push({
+            name: response.data.convertedData,
+            scene: this.selectedScene, // 或从API响应获取
+            date: new Date().toLocaleString()
+          });
+          ElMessage.success(response.data.message);
+          this.outputFileName = ''; // 清空
+        } else {
+          ElMessage.error(response.data.message || '转化失败');
+        }
+      } catch (error) {
+        ElMessage.error('转化请求失败: ' + error.message);
+      } finally {
+        this.isLoading = false;
+        loadingInstance.close();
+      }
+    },
 
-      // 模拟数据转化
-      const convertedFile = {
-        name: this.outputFileName,
-        scene: this.selectedScene, // 记录适用场景
-        date: new Date().toLocaleString()
-      };
+    async convertUploadedFile() { // 对应 API 1.2
+      if (!this.uploadedFile) {
+        ElMessage.error('请先选择要上传的文件');
+        return;
+      }
+      if (!this.selectedScene) {
+        ElMessage.error('请选择一个应用场景');
+        return;
+      }
+      this.isLoading = true;
+      const loadingInstance = ElLoading.service({ text: '正在上传并转化文件...' });
+      try {
+        const formData = new FormData();
+        formData.append('file', this.uploadedFile);
+        formData.append('scene', this.selectedScene);
+        // 如果需要传递选中的Ollama模型
+        // formData.append('model_name', this.selectedOllamaModel);
 
-      this.convertedFiles.push(convertedFile);
-      alert(`文件转化成功，文件名：${this.outputFileName}`);
+
+        const response = await axios.post(`${API_BASE_URL}/convert/upload`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+
+        if (response.data.success) {
+          this.convertedFiles.push({
+            name: this.uploadedFile.name + "_converted", // 或从API获取更准确的文件名
+            scene: this.selectedScene,
+            data: response.data.convertedData, // API 返回的是 "转换后的数据"
+            date: new Date().toLocaleString()
+          });
+          ElMessage.success(response.data.message);
+          this.uploadedFile = null; // 清空已上传文件状态
+          // 你可能需要更新el-upload组件的状态来清除显示的文件名
+        } else {
+          ElMessage.error(response.data.message || '文件上传转化失败');
+        }
+      } catch (error) {
+        ElMessage.error('文件上传转化请求失败: ' + error.message);
+      } finally {
+        this.isLoading = false;
+        loadingInstance.close();
+      }
+    },
+    loadOllamaModels() {
+      const models = localStorage.getItem('ollama_models');
+      if (models) {
+        this.ollamaModels = JSON.parse(models);
+      }
     }
   },
   mounted() {
+    this.loadOllamaModels();
     setInterval(() => {
       this.currentTime = new Date().toLocaleTimeString();
     }, 1000);
