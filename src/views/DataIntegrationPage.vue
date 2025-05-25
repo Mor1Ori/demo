@@ -269,22 +269,86 @@ export default {
       }
     },
 
-    triggerRemoveSensitiveWords() {
-      this.processDataWithApi(
-        `${API_BASE_URL_SENSITIVE}/filter_sensitive`,
-        {}, // payload for processDataWithApi is constructed inside
-        (val) => this.isLoadingSensitive = val,
-        '敏感词过滤完成！'
-      );
+    // 敏感词过滤（本地脚本参数通过前端传递）
+    async triggerRemoveSensitiveWords() {
+      if (this.tableData.length === 0) {
+        ElMessage.warning('表格中没有数据可以处理。');
+        return;
+      }
+      if (!this.selectedColumnForProcessing) {
+        ElMessage.warning('请选择要操作的列。');
+        return;
+      }
+      this.isLoadingSensitive = true;
+      this.isTableLoading = true;
+      this.showFullScreenLoading('正在去除敏感词...');
+      try {
+        // 前端将数据保存为临时文件，传递 input_path/output_path/text_column
+        const inputData = this.tableData;
+        const inputPath = 'temp_input.json';
+        const outputPath = 'temp_output.json';
+        // 假设后端提供 /filter_sensitive 接口，参数与脚本一致
+        const response = await axios.post(`${API_BASE_URL_SENSITIVE}/filter_sensitive`, {
+          input_path: inputPath,
+          output_path: outputPath,
+          text_column: this.selectedColumnForProcessing,
+          data: inputData // 直接传递数据，后端可落盘
+        });
+        if (response.data && response.data.processed_data) {
+          this.tableData = response.data.processed_data;
+          this.markChanges();
+          ElMessage.success(response.data.message || '敏感词过滤完成！');
+        } else {
+          ElMessage.error('敏感词过滤失败：无返回数据');
+        }
+      } catch (error) {
+        ElMessage.error('敏感词过滤失败: ' + (error.response?.data?.error || error.message));
+      } finally {
+        this.isLoadingSensitive = false;
+        this.isTableLoading = false;
+        this.hideFullScreenLoading();
+      }
     },
 
-    triggerRemovePersonalInfo() {
-      this.processDataWithApi(
-        `${API_BASE_URL_PII}/remove_pii`,
-        {},
-        (val) => this.isLoadingPII = val,
-        '个人信息去除完成！'
-      );
+    // 去除个人信息（本地脚本参数通过前端传递）
+    async triggerRemovePersonalInfo() {
+      if (this.tableData.length === 0) {
+        ElMessage.warning('表格中没有数据可以处理。');
+        return;
+      }
+      if (!this.selectedColumnForProcessing) {
+        ElMessage.warning('请选择要操作的列。');
+        return;
+      }
+      this.isLoadingPII = true;
+      this.isTableLoading = true;
+      this.showFullScreenLoading('正在去除个人信息...');
+      try {
+        // 前端将数据保存为临时文件，传递 input_path/output_path/text_column
+        const inputData = this.tableData;
+        const inputPath = 'temp_input.json';
+        const outputPath = 'temp_output.json';
+        // 假设后端提供 /remove_pii 接口，参数与脚本一致
+        const response = await axios.post(`${API_BASE_URL_PII}/remove_pii`, {
+          input_path: inputPath,
+          output_path: outputPath,
+          text_column: this.selectedColumnForProcessing,
+          data: inputData // 直接传递数据，后端可落盘
+        });
+        if (response.data && response.data.processed_data) {
+          this.tableData = response.data.processed_data;
+          this.markChanges();
+          ElMessage.success(response.data.message || '个人信息去除完成！');
+        } else {
+          ElMessage.error('个人信息去除失败：无返回数据');
+        }
+      } catch (error) {
+        ElMessage.error('个人信息去除失败: ' + (error.response?.data?.error || error.message));
+      } finally {
+        this.isLoadingPII = false;
+        this.isTableLoading = false;
+        this.hideFullScreenLoading();
+      }
     },
 
     async triggerAddSensitiveKeyword() {
