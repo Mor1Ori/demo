@@ -177,9 +177,9 @@ export default {
     async fetchConversations() {
       try {
         const response = await axios.get('/chat');
-        const { Success, chats } = response.data;
+        const { success, chats } = response.data;
 
-        if (!Success) {
+        if (!success) {
           throw new Error('获取对话列表失败');
         }
 
@@ -505,23 +505,43 @@ export default {
     },
 
     // Export conversation history (3.8)
-    exportConversationHistory() {
+    async exportConversationHistory() {
       if (this.activeConversationIndex < 0 || !this.conversations[this.activeConversationIndex]) {
         ElMessage.warning('没有活动的对话可以导出。');
         return;
       }
       const conversationToExp = this.conversations[this.activeConversationIndex];
-      const jsonData = JSON.stringify(conversationToExp, null, 2);
-      const blob = new Blob([jsonData], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${conversationToExp.name || 'conversation'}_history.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      ElMessage.success('对话历史已导出为JSON!');
+      try {
+        // 先请求后端获取标准 history
+        const response = await axios.get('/chat/history', {
+          params: {
+            chatId: conversationToExp.id,
+            title: conversationToExp.name
+          }
+        });
+        const { success, history } = response.data;
+        if (!success) throw new Error('获取对话历史失败');
+        // 导出为标准 QA 结构
+        const qaArray = history.map(item => ({
+          id: item.id,
+          question: item.question,
+          answer: item.answer,
+          timestamp: item.timestamp
+        }));
+        const jsonData = JSON.stringify(qaArray, null, 2);
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${conversationToExp.name || 'conversation'}_history.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        ElMessage.success('对话历史已导出为JSON!');
+      } catch (error) {
+        ElMessage.error(`导出对话历史失败: ${error.message}`);
+      }
     },
 
     // Scroll to bottom of chat window

@@ -77,6 +77,12 @@
               <el-option label="API Endpoint 2" value="api_2"></el-option>
             </el-select>
           </div>
+          <!-- 新增：选择本地safetensors格式模型 -->
+          <div class="config-item">
+            <label>选择本地safetensors格式模型</label>
+            <el-button type="primary" @click="selectLocalModelPath" style="width:100%;">选择模型文件夹路径</el-button>
+            <div v-if="localModelPath" class="path-display">路径: {{ localModelPath }}</div>
+          </div>
         </div>
 
         <!-- Right: Actions -->
@@ -106,6 +112,10 @@
             </template>
           </el-table-column>
         </el-table>
+        <!-- 居中显示开始生成按钮 -->
+        <div style="width:100%;display:flex;justify-content:center;margin-top:24px;">
+          <el-button type="success" class="start-generation-btn" @click="handleStartGeneration" style="width: 180px; font-size: 15px;">开始生成</el-button>
+        </div>
       </div>
     </el-card>
   </div>
@@ -130,6 +140,7 @@ export default {
       selectedField: '',
       selectedModel: '',
       selectedApi: '',
+      localModelPath: '', // 新增本地模型路径
       processedFiles: [
         { id: 1, name: '已转化文件1.json', scene: '情感分类', time: '2025-03-19 10:30:45' },
         { id: 2, name: '已转化文件2.txt', scene: '工单预测', time: '2025-03-19 10:30:45' },
@@ -175,7 +186,32 @@ export default {
     },
     downloadFile(row) {
       alert(`下载文件: ${row.name}`);
-    }
+    },
+    // 新增：选择本地模型路径
+    async selectLocalModelPath() {
+      // 仅演示，实际可用 window.showDirectoryPicker 或 input[type=file] webkitdirectory
+      // 这里用 prompt 模拟
+      const path = prompt('请输入本地safetensors模型文件夹路径:');
+      if (path) {
+        this.localModelPath = path;
+      }
+    },
+    // 新增：开始生成按钮逻辑
+    handleStartGeneration() {
+      if (!this.uploadedFile) {
+        this.$message.warning('请先上传json文件');
+        return;
+      }
+      if (!this.selectedField || !this.selectedModel || !this.selectedApi) {
+        this.$message.warning('请先选择字段、模型和API');
+        return;
+      }
+      if (!this.localModelPath) {
+        this.$message.warning('请选择本地safetensors模型路径');
+        return;
+      }
+      this.$message.success('开始生成！（此处可补充实际生成逻辑）');
+    },
   },
   mounted() {
     this.timer = setInterval(() => {
@@ -360,7 +396,6 @@ export default {
 }
 
 /* Common background styles */
-.floating-particles, .rainbow-stripes { /* Same as in DataIntegrationPage.vue */ }
 .floating-particles {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   pointer-events: none; z-index: -2;

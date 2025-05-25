@@ -113,86 +113,75 @@ export default {
       this.$router.push('/');
     },
 
-    // 新增的方法：
-    handleFileUploadForConversion(uploadFile) {
-      this.uploadedFile = uploadFile.raw; // 获取原始文件对象
+    // 上传文件并转化（API 1.2）
+    async handleFileUpload(file) {
+      this.uploadedFile = file.raw;
     },
 
-    async convertDataSimple() { // 对应 API 1.1 (如果适用，API描述不清晰)
-      if (!this.outputFileName.trim()) {
-        ElMessage.error('请输入转化后的文件名');
-        return;
-      }
-      this.isLoading = true;
-      const loadingInstance = ElLoading.service({ text: '正在转化...' });
-      try {
-        const payload = {
-          inputData: this.outputFileName, // API 文档中是 "转化后的文件名"
-          conversionType: "text_processing_example" // API 1.1 的 conversionType 需要明确
-        };
-        const response = await axios.post(`${API_BASE_URL}/convert`, payload);
-        if (response.data.success) {
-          this.convertedFiles.push({
-            name: response.data.convertedData,
-            scene: this.selectedScene, // 或从API响应获取
-            date: new Date().toLocaleString()
-          });
-          ElMessage.success(response.data.message);
-          this.outputFileName = ''; // 清空
-        } else {
-          ElMessage.error(response.data.message || '转化失败');
+    async convertData() {
+      if (this.uploadedFile) {
+        // 走文件上传转化接口 1.2
+        if (!this.selectedScene) {
+          ElMessage.error('请选择一个应用场景');
+          return;
         }
-      } catch (error) {
-        ElMessage.error('转化请求失败: ' + error.message);
-      } finally {
-        this.isLoading = false;
-        loadingInstance.close();
-      }
-    },
-
-    async convertUploadedFile() { // 对应 API 1.2
-      if (!this.uploadedFile) {
-        ElMessage.error('请先选择要上传的文件');
-        return;
-      }
-      if (!this.selectedScene) {
-        ElMessage.error('请选择一个应用场景');
-        return;
-      }
-      this.isLoading = true;
-      const loadingInstance = ElLoading.service({ text: '正在上传并转化文件...' });
-      try {
-        const formData = new FormData();
-        formData.append('file', this.uploadedFile);
-        formData.append('scene', this.selectedScene);
-        // 如果需要传递选中的Ollama模型
-        // formData.append('model_name', this.selectedOllamaModel);
-
-
-        const response = await axios.post(`${API_BASE_URL}/convert/upload`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
+        this.isLoading = true;
+        const loadingInstance = ElLoading.service({ text: '正在上传并转化文件...' });
+        try {
+          const formData = new FormData();
+          formData.append('file', this.uploadedFile);
+          formData.append('scene', this.selectedScene);
+          const response = await axios.post(`${API_BASE_URL}/convert/upload`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          if (response.data.success) {
+            this.convertedFiles.push({
+              name: response.data.convertedData,
+              scene: this.selectedScene,
+              date: new Date().toLocaleString()
+            });
+            ElMessage.success(response.data.message);
+            this.uploadedFile = null;
+          } else {
+            ElMessage.error(response.data.message || '文件上传转化失败');
           }
-        });
-
-        if (response.data.success) {
-          this.convertedFiles.push({
-            name: this.uploadedFile.name + "_converted", // 或从API获取更准确的文件名
-            scene: this.selectedScene,
-            data: response.data.convertedData, // API 返回的是 "转换后的数据"
-            date: new Date().toLocaleString()
-          });
-          ElMessage.success(response.data.message);
-          this.uploadedFile = null; // 清空已上传文件状态
-          // 你可能需要更新el-upload组件的状态来清除显示的文件名
-        } else {
-          ElMessage.error(response.data.message || '文件上传转化失败');
+        } catch (error) {
+          ElMessage.error('文件上传转化请求失败: ' + error.message);
+        } finally {
+          this.isLoading = false;
+          loadingInstance.close();
         }
-      } catch (error) {
-        ElMessage.error('文件上传转化请求失败: ' + error.message);
-      } finally {
-        this.isLoading = false;
-        loadingInstance.close();
+      } else {
+        // 走普通数据转化接口 1.1
+        if (!this.outputFileName.trim()) {
+          ElMessage.error('请输入转化后的文件名');
+          return;
+        }
+        this.isLoading = true;
+        const loadingInstance = ElLoading.service({ text: '正在转化...' });
+        try {
+          const payload = {
+            inputData: this.outputFileName,
+            conversionType: 'text_to_speech' // 或根据实际需求动态选择
+          };
+          const response = await axios.post(`${API_BASE_URL}/convert`, payload);
+          if (response.data.success) {
+            this.convertedFiles.push({
+              name: response.data.convertedData,
+              scene: this.selectedScene,
+              date: new Date().toLocaleString()
+            });
+            ElMessage.success(response.data.message);
+            this.outputFileName = '';
+          } else {
+            ElMessage.error(response.data.message || '转化失败');
+          }
+        } catch (error) {
+          ElMessage.error('转化请求失败: ' + error.message);
+        } finally {
+          this.isLoading = false;
+          loadingInstance.close();
+        }
       }
     },
     loadOllamaModels() {
