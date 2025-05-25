@@ -11,9 +11,11 @@
       </div>
     -->
       <el-menu :default-active="activeMenu" router @select="handleMenuSelect">
-        <el-menu-item index="/" class="menu-item">
-          <el-icon><UploadFilled /></el-icon>
-          <span>数据转化</span>
+       
+ <el-menu-item index="/chat" class="menu-item">
+          <!-- 使用 el-icon 组件来包裹图标，确保一致性 -->
+          <el-icon><ChatDotRound /></el-icon>
+          <span>智能聊天</span>
         </el-menu-item>
 
         <el-menu-item index="/rag-management" class="menu-item">
@@ -21,10 +23,11 @@
           <span>RAG 模块管理</span>
         </el-menu-item>
 
-        <el-menu-item index="/chat" class="menu-item">
-          <!-- 使用 el-icon 组件来包裹图标，确保一致性 -->
-          <el-icon><ChatDotRound /></el-icon>
-          <span>智能聊天</span>
+       
+
+ <el-menu-item index="/" class="menu-item">
+          <el-icon><UploadFilled /></el-icon>
+          <span>数据转化</span>
         </el-menu-item>
 
         <!-- 新增：数据预集成与操作 入口 -->
