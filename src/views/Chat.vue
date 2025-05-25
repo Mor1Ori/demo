@@ -35,7 +35,7 @@
               v-for="(conv, index) in conversations"
               :key="conv.id || index"
               :class="{'active-conversation': index === activeConversationIndex}"
-              @click="switchConversation(index)"
+              @click="fetchMessagesForConversation(index)"
             >
               <span class="conv-name">{{ conv.name }}</span>
               <div class="conv-actions">
@@ -101,8 +101,8 @@
           <div class="config-item">
             <label>选择模型</label>
             <el-select v-model="selectedRemoteModel" placeholder="下拉选择模型" style="width:100%;">
-              <el-option label="DeepSeek V2" value="DeepSeek V2"></el-option>
-              <el-option label="GPT-4" value="GPT-4"></el-option>
+              <el-option label="DeepSeek R1" value="deepseek-r1:8b"></el-option>
+              <el-option label="llama3.2" value="llama3.2:latest"></el-option>
             </el-select>
             <el-button type="success" size="small" @click="loadRemoteModel" class="config-button">加载模型</el-button>
           </div>
@@ -134,6 +134,7 @@
 import { Refresh, HomeFilled, Promotion, Plus, Edit, Delete } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import axios from 'axios';
+const API_BASE_URL = 'http://localhost:5000';
 
 export default {
   name: 'ChatPage',
@@ -148,6 +149,7 @@ export default {
       currentTime: new Date().toLocaleTimeString(),
       currentModelApiInfo: '',
       selectedRemoteModel: '',
+      model_name: '',
       apiEndpoint: '',
       localModelPath: '',
       enableHistory: true,
@@ -176,7 +178,7 @@ export default {
     // Fetch conversation list (3.1: GET /chat)
     async fetchConversations() {
       try {
-        const response = await axios.get('/chat');
+        const response = await axios.get(`${API_BASE_URL}/chat`);
         const { success, chats } = response.data;
 
         if (!success) {
@@ -191,7 +193,8 @@ export default {
 
         if (this.conversations.length > 0) {
           this.activeConversationIndex = 0;
-          await this.fetchMessagesForConversation(0);
+          // 批量获取所有历史消息
+          await Promise.all(this.conversations.map((_, idx) => this.fetchMessagesForConversation(idx)));
         } else {
           this.activeConversationIndex = -1;
         }
@@ -204,7 +207,8 @@ export default {
           this.conversations = JSON.parse(storedConversations);
           if (this.conversations.length > 0) {
             this.activeConversationIndex = 0;
-            await this.fetchMessagesForConversation(0);
+            // 批量获取所有历史消息（本地恢复时也一致）
+            await Promise.all(this.conversations.map((_, idx) => this.fetchMessagesForConversation(idx)));
           }
         } else {
           this.conversations = [];
@@ -216,9 +220,11 @@ export default {
     // Fetch conversation history (3.4: GET /chat/history)
     async fetchMessagesForConversation(convIndex) {
       if (convIndex < 0 || !this.conversations[convIndex]) return;
+      // 切换高亮
+      this.activeConversationIndex = convIndex;
       try {
         const conv = this.conversations[convIndex];
-        const response = await axios.get('/chat/history', {
+        const response = await axios.get(`${API_BASE_URL}/chat/history`, {
           params: {
             chatId: conv.id,
             title: conv.name
@@ -267,7 +273,7 @@ export default {
         const newConvTitle = value.trim();
         const tempChatId = this.generateUUID();
 
-        const response = await axios.post('/chat/create', {
+        const response = await axios.post(`${API_BASE_URL}/chat/create`, {
           chatId: tempChatId,
           title: newConvTitle
         });
@@ -309,7 +315,7 @@ export default {
 
         const newName = value.trim();
         if (newName !== conversation.name) {
-          const response = await axios.patch('/chat/update', {
+          const response = await axios.patch(`${API_BASE_URL}/chat/update`, {
             chatId: conversation.id,
             title: newName
           });
@@ -340,7 +346,7 @@ export default {
           type: 'warning',
         });
 
-        const response = await axios.delete('/chat/delete', {
+        const response = await axios.delete(`${API_BASE_URL}/chat/delete`, {
           data: {
             chatId: conversation.id,
             title: conversation.name
@@ -392,7 +398,7 @@ export default {
       this.scrollToBottom();
 
       try {
-        const response = await axios.post('/chat/send', {
+        const response = await axios.post(`${API_BASE_URL}/chat/send`, {
           chatId: currentConv.id,
           title: currentConv.name,
           use_conversation_history: this.enableHistory,
@@ -409,7 +415,10 @@ export default {
         const aiMessage = {
           id: `msg_${Date.now()}_ai`,
           sender: 'ai',
-          text: aiResponseText,
+          text:
+             (this.showModelThinking && think ? `【模型思考】${think}\n\r` : '') +
+              `【回答内容】${aiResponseText}` +
+              (this.showRagReference && sources ? `\n\r【RAG参考】${Array.isArray(sources) ? sources.join(', ') : sources}` : ''),
           timestamp: new Date().toISOString(),
           think: this.showModelThinking ? think : null,
           sources: this.showRagReference ? sources : null
@@ -433,9 +442,9 @@ export default {
         return;
       }
       try {
-        const response = await axios.post('/chat/load_model', {
+        const response = await axios.post(`${API_BASE_URL}/chat/load_model`, {
           model_type: 'ollama',
-          model_name: this.selectedRemoteModel,
+          model_name: this.selectedRemoteModel, 
           model_path: '',
           api: ''
         });
@@ -459,7 +468,7 @@ export default {
         return;
       }
       try {
-        const response = await axios.post('/chat/load_model', {
+        const response = await axios.post(`${API_BASE_URL}/chat/load_model`, {
           model_type: 'api',
           model_name: '',
           model_path: '',
@@ -480,27 +489,54 @@ export default {
 
     // Load local safetensors model (3.6: POST /chat/load_model with model_type: safetensors)
     async selectLocalModelPath() {
-      if (!this.localModelPath) {
-        ElMessage.warning('请先选择模型文件夹路径');
-        return;
-      }
+      // 打开文件夹选择框
       try {
-        const response = await axios.post('/chat/load_model', {
-          model_type: 'safetensors',
-          model_name: '',
-          model_path: this.localModelPath,
-          api: ''
-        });
+        // 仅支持 Electron/桌面端或通过 input[type=file] 变通实现
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.webkitdirectory = true;
+        input.directory = true;
+        input.style.display = 'none';
+        document.body.appendChild(input);
+        input.click();
+        input.onchange = async (event) => {
+          const files = event.target.files;
+          if (!files || files.length === 0) {
+            ElMessage.warning('未选择任何文件夹');
+            document.body.removeChild(input);
+            return;
+          }
+          // 获取文件夹路径（取第一个文件的路径的上级目录）
+          const firstFile = files[0];
+          let folderPath = '';
+          if (firstFile.webkitRelativePath) {
+            folderPath = firstFile.webkitRelativePath.split('/')[0];
+          } else {
+            folderPath = firstFile.name;
+          }
+          this.localModelPath = folderPath;
+          document.body.removeChild(input);
 
-        const { success, message } = response.data;
-        if (!success) {
-          throw new Error(message || '本地模型加载失败');
-        }
-
-        this.currentModelApiInfo = `本地模型: ${this.localModelPath} (已加载)`;
-        ElMessage.success('本地模型加载成功!');
+          // 选择后自动加载模型
+          try {
+            const response = await axios.post(`${API_BASE_URL}/chat/load_model`, {
+              model_type: 'safetensors',
+              model_name: '',
+              model_path: this.localModelPath,
+              api: ''
+            });
+            const { success, message } = response.data;
+            if (!success) {
+              throw new Error(message || '本地模型加载失败');
+            }
+            this.currentModelApiInfo = `本地模型: ${this.localModelPath} (已加载)`;
+            ElMessage.success('本地模型加载成功!');
+          } catch (error) {
+            ElMessage.error(`本地模型加载失败: ${error.message}`);
+          }
+        };
       } catch (error) {
-        ElMessage.error(`本地模型加载失败: ${error.message}`);
+        ElMessage.error(`文件夹选择失败: ${error.message}`);
       }
     },
 
@@ -513,7 +549,7 @@ export default {
       const conversationToExp = this.conversations[this.activeConversationIndex];
       try {
         // 先请求后端获取标准 history
-        const response = await axios.get('/chat/history', {
+        const response = await axios.get(`${API_BASE_URL}/chat/history`, {
           params: {
             chatId: conversationToExp.id,
             title: conversationToExp.name

@@ -92,9 +92,7 @@
             <div>需要添加的加载动画...</div>
             <div>需要添加的加载进度...</div>
           </el-card>
-          <el-button type="warning" @click="directUpload" class="direct-upload-btn">
-            直接上传
-          </el-button>
+          <!-- 移除右侧的直接上传按钮，避免重复 -->
         </div>
       </div>
 
@@ -112,9 +110,10 @@
             </template>
           </el-table-column>
         </el-table>
-        <!-- 居中显示开始生成按钮 -->
-        <div style="width:100%;display:flex;justify-content:center;margin-top:24px;">
+        <!-- 并排居中显示开始生成和直接上传按钮 -->
+        <div style="width:100%;display:flex;justify-content:center;gap:24px;margin-top:24px;">
           <el-button type="success" class="start-generation-btn" @click="handleStartGeneration" style="width: 180px; font-size: 15px;">开始生成</el-button>
+          <el-button type="warning" @click="directUpload" class="direct-upload-btn" style="width: 180px; font-size: 15px;">直接上传</el-button>
         </div>
       </div>
     </el-card>
