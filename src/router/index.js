@@ -9,6 +9,10 @@ import JsonGenerationPage from '../views/JsonGenerationPage.vue';
 const routes = [
   {
     path: '/',
+    redirect: '/chat'
+  },
+  {
+    path: '/home',
     name: 'home',
     component: Home
   },

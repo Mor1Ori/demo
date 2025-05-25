@@ -55,7 +55,7 @@
           <div class="column-selector" v-if="tableData.length > 0">
             <el-form inline>
               <el-form-item label="选择操作列(敏感词/PII):">
-                <el-select v-model="selectedColumnForProcessing" placeholder="选择列">
+                <el-select v-model="selectedColumnForProcessing" placeholder="选择列" style="width: 220px;">
                   <el-option v-for="col in availableColumns" :key="col.prop" :label="col.label" :value="col.prop"></el-option>
                 </el-select>
               </el-form-item>
