@@ -10,24 +10,6 @@
     </div>
     <h1 style="font-size: 24px; margin-bottom: 20px;">📁 RAG 模块管理</h1>
     
-    <div style="display:flex; justify-content: space-between; align-items: center; height: 50px; margin-bottom: 20px;">
-      <div style="height: 50px; margin-right: 20px;">
-        <el-input
-          v-model="searchQuery"
-          placeholder="输入文件名搜索"
-          clearable
-          style="padding-right: 10px; width: 250px;height: 40px;"
-        />
-        <el-button
-          type="primary"
-          @click="searchDocuments"
-          style=" padding-left: 10px;"
-        >
-          <el-icon><Search /></el-icon> 搜索
-        </el-button>
-      </div>
-    </div>
-
     <el-card class="table-container">
       <!-- 大表格：数据库文件显示区 -->
       <div style="display: flex; align-items: center; margin-bottom:4px;">
@@ -70,6 +52,22 @@
       <!-- 向量搜索文件显示区 -->
       <div style="display: flex; align-items: center; margin-bottom:4px; margin-top: 60px;">
         <span style="font-weight:bold;">向量搜索文件显示：</span>
+        <div style="display: flex; align-items: center; margin-left: 10px;">
+          <el-input
+            v-model="searchQuery"
+            placeholder="输入文件名搜索"
+            clearable
+            style="width: 220px; height: 40px; margin-right: 8px; background: #fff; color: #222; border-radius: 4px; border: 1.5px solid #3B82F6; box-shadow: none;"
+            input-style="background: #fff; color: #222; border-radius: 4px; border: none;"
+          />
+          <!-- <el-button
+            type="primary"
+            @click="searchDocuments"
+            style="height: 40px;"
+          >
+            <el-icon><Search /></el-icon> 搜索
+          </el-button> -->
+        </div>
       </div>
       <div style="display: flex; margin-top: 5px; margin-bottom: 10px;">
         <template v-if="!showVectorFiles">
@@ -474,24 +472,21 @@ export default {
       input.onchange = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
-        // 获取文件夹名（单文件时取webkitRelativePath的第一个目录，否则为空）
-        let folderName = '';
-        if (file.webkitRelativePath) {
-          const parts = file.webkitRelativePath.split('/');
-          if (parts.length > 1) folderName = parts[0];
-        }
+        // 只取文件名+后缀
+        const fileName = file.name;
+        // 不再弹窗，force_reprocess 默认 false
+        const forceReprocess = false;
         this.isLoadingTable = true;
-        const loadingInstance = ElLoading.service({ text: '正在上传文件...' });
+        const loadingInstance = this.$loading ? this.$loading({ text: '正在上传文件...' }) : ElLoading.service({ text: '正在上传文件...' });
         try {
-          const formData = new FormData();
-          formData.append('file', file);
-          if (folderName) formData.append('folder_name', folderName);
-          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-document`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
+          const payload = {
+            file_path: fileName,
+            force_reprocess: forceReprocess
+          };
+          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-document`, payload);
           const data = response.data;
           if (data.success) {
-            ElMessage.success('文件上传成功');
+            ElMessage.success(data.message || '文件上传成功');
             this.fetchRagManagementData && this.fetchRagManagementData();
           } else {
             ElMessage.error(data.message || '上传文档失败');
