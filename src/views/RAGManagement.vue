@@ -111,21 +111,14 @@
        <!-- 向量储存文件显示区 -->
       <div style="font-weight:bold;margin-bottom:4px;">向量储存文件显示：</div>
       <div style="position: relative; display: flex; margin-top: 5px; margin-bottom: 40px;">
-        <template v-if="showVectorFiles">
-          <el-table :data="[vectorStats]" border style="width: 100%; margin-bottom: 10px;">
-            <el-table-column prop="totalChunks" label="总分块数" width="100" align="center" />
-            <el-table-column prop="totalFiles" label="总文件数" width="100" align="center" />
-            <el-table-column prop="pdfCount" label="pdf文件" width="100" align="center" />
-            <el-table-column prop="txtCount" label="txt文件" width="100" align="center" />
-            <el-table-column prop="docxCount" label="docx文件" width="100" align="center" />
-            <el-table-column prop="csvCount" label="csv文件" width="100" align="center" />
-          </el-table>
-        </template>
-        <template v-else>
-          <el-table :data="[databaseStats]" border style="width: 100%; margin-bottom: 10px;">
-            <el-table-column prop="totalTables" label="总表数" width="120" align="center" />
-          </el-table>
-        </template>
+        <el-table :data="[vectorStats]" border style="width: 100%; margin-bottom: 10px;">
+          <el-table-column prop="totalChunks" label="总分块数" width="100" align="center" />
+          <el-table-column prop="totalFiles" label="总文件数" width="100" align="center" />
+          <el-table-column prop="pdfCount" label="pdf文件" width="100" align="center" />
+          <el-table-column prop="txtCount" label="txt文件" width="100" align="center" />
+          <el-table-column prop="docxCount" label="docx文件" width="100" align="center" />
+          <el-table-column prop="csvCount" label="csv文件" width="100" align="center" />
+        </el-table>
         <!-- 向量按钮区，绝对定位在表格右下角 -->
         <div class="table-footer-btns vector-btns">
           <el-button type="primary" @click="uploadSingleDocument">上传向量化检索文档</el-button>
@@ -333,9 +326,9 @@ export default {
     },
     // 默认加载向量文件（2.1/2.3）
     async loadRagData() {
-      this.showVectorFiles = true;
-      await this.fetchRagManagementData();
+      this.showVectorFiles = true; // 只在这里切换
       await this.fetchDatabaseTables();
+      await this.fetchRagManagementData();
     },
     // 获取RAG文档列表及统计（2.1）
     async fetchRagManagementData() {
@@ -346,10 +339,12 @@ export default {
         const ragStatus = data.rag_status || {};
         this.vectorStats.totalChunks = ragStatus.document_count;
         this.vectorStats.totalFiles = ragStatus.file_count;
-        this.vectorStats.pdfCount = ragStatus.file_type_counts?.pdf || 0;
-        this.vectorStats.txtCount = ragStatus.file_type_counts?.txt || 0;
-        this.vectorStats.docxCount = ragStatus.file_type_counts?.docx || 0;
-        this.vectorStats.csvCount = ragStatus.file_type_counts?.csv || 0;
+        // 兼容 file_type_counts 字段带点和不带点的情况
+        const typeCounts = ragStatus.file_type_counts || {};
+        this.vectorStats.pdfCount = typeCounts[".pdf"] ?? typeCounts["pdf"] ?? 0;
+        this.vectorStats.txtCount = typeCounts[".txt"] ?? typeCounts["txt"] ?? 0;
+        this.vectorStats.docxCount = typeCounts[".docx"] ?? typeCounts["docx"] ?? 0;
+        this.vectorStats.csvCount = typeCounts[".csv"] ?? typeCounts["csv"] ?? 0;
         // recent_files 默认显示
         this.documents = (ragStatus.recent_files || []).map(f => ({
           id: f.path || f.name || f.file_name || '',
@@ -368,7 +363,7 @@ export default {
     },
     // 获取数据库表信息（改为从 /rag-management 获取 json 数据）
     async fetchDatabaseTables() {
-      this.showVectorFiles = false;
+      // 不再切换 showVectorFiles，只负责 recentTables 赋值
       try {
         const response = await axios.get(`${API_BASE_URL}/rag-management`);
         const data = response.data;
@@ -407,14 +402,15 @@ export default {
         this.showVectorFiles = true;
         this.searchQuery = '';
         this.currentPage = 1;
-        // 同步刷新统计信息
+        // 同步刷新统计信息，兼容带点和不带点
         const ragStatus = data.rag_status || {};
         this.vectorStats.totalChunks = ragStatus.document_count;
         this.vectorStats.totalFiles = ragStatus.file_count;
-        this.vectorStats.pdfCount = ragStatus.file_type_counts?.pdf || 0;
-        this.vectorStats.txtCount = ragStatus.file_type_counts?.txt || 0;
-        this.vectorStats.docxCount = ragStatus.file_type_counts?.docx || 0;
-        this.vectorStats.csvCount = ragStatus.file_type_counts?.csv || 0;
+        const typeCounts = ragStatus.file_type_counts || {};
+        this.vectorStats.pdfCount = typeCounts[".pdf"] ?? typeCounts["pdf"] ?? 0;
+        this.vectorStats.txtCount = typeCounts[".txt"] ?? typeCounts["txt"] ?? 0;
+        this.vectorStats.docxCount = typeCounts[".docx"] ?? typeCounts["docx"] ?? 0;
+        this.vectorStats.csvCount = typeCounts[".csv"] ?? typeCounts["csv"] ?? 0;
         // 强制刷新表格
         this.$forceUpdate && this.$forceUpdate();
       } catch (error) {
@@ -441,14 +437,15 @@ export default {
         this.showVectorFiles = true;
         this.searchQuery = '';
         this.currentPage = 1;
-        // 同步刷新统计信息
+        // 同步刷新统计信息，兼容带点和不带点
         const ragStatus = data.rag_status || {};
         this.vectorStats.totalChunks = ragStatus.document_count;
         this.vectorStats.totalFiles = ragStatus.file_count;
-        this.vectorStats.pdfCount = ragStatus.file_type_counts?.pdf || 0;
-        this.vectorStats.txtCount = ragStatus.file_type_counts?.txt || 0;
-        this.vectorStats.docxCount = ragStatus.file_type_counts?.docx || 0;
-        this.vectorStats.csvCount = ragStatus.file_type_counts?.csv || 0;
+        const typeCounts = ragStatus.file_type_counts || {};
+        this.vectorStats.pdfCount = typeCounts[".pdf"] ?? typeCounts["pdf"] ?? 0;
+        this.vectorStats.txtCount = typeCounts[".txt"] ?? typeCounts["txt"] ?? 0;
+        this.vectorStats.docxCount = typeCounts[".docx"] ?? typeCounts["docx"] ?? 0;
+        this.vectorStats.csvCount = typeCounts[".csv"] ?? typeCounts["csv"] ?? 0;
         // 强制刷新表格
         this.$forceUpdate && this.$forceUpdate();
       } catch (error) {
@@ -456,18 +453,18 @@ export default {
       }
     },
 
-    // 查看数据库文件（2.4）
-    async fetchDatabaseTables() {
-      try {
-        const response = await axios.get(`${API_BASE_URL}/rag-management`);
-        const data = response.data;
-        this.databaseStats.totalTables = data.table_count;
-        // recent_tables 可用于表格展示
-        // data.recent_tables
-      } catch (error) {
-        ElMessage.error('获取数据库表失败: ' + error.message);
-      }
-    },
+    // // 查看数据库文件（2.4）
+    // async fetchDatabaseTables() {
+    //   try {
+    //     const response = await axios.get(`${API_BASE_URL}/rag-management`);
+    //     const data = response.data;
+    //     this.databaseStats.totalTables = data.table_count;
+    //     // recent_tables 可用于表格展示
+    //     // data.recent_tables
+    //   } catch (error) {
+    //     ElMessage.error('获取数据库表失败: ' + error.message);
+    //   }
+    // },
 
     // 上传单个文本文件（2.6）
     async uploadSingleDocument() {
@@ -477,25 +474,21 @@ export default {
       input.onchange = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
-        // 弹窗询问 force_reprocess
-        let forceReprocess = false;
-        try {
-          forceReprocess = await this.$confirm('是否强制重新处理同名文件？', '强制处理', {
-            confirmButtonText: '是',
-            cancelButtonText: '否',
-            distinguishCancelAndClose: true,
-            type: 'warning',
-          }).then(() => true).catch(() => false);
-        } catch (e) { forceReprocess = false; }
+        // 获取文件夹名（单文件时取webkitRelativePath的第一个目录，否则为空）
+        let folderName = '';
+        if (file.webkitRelativePath) {
+          const parts = file.webkitRelativePath.split('/');
+          if (parts.length > 1) folderName = parts[0];
+        }
         this.isLoadingTable = true;
         const loadingInstance = ElLoading.service({ text: '正在上传文件...' });
         try {
-          // 只传文件名和force_reprocess
-          const payload = {
-            file_path: file.name,
-            force_reprocess: forceReprocess
-          };
-          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-document`, payload);
+          const formData = new FormData();
+          formData.append('file', file);
+          if (folderName) formData.append('folder_name', folderName);
+          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-document`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
           const data = response.data;
           if (data.success) {
             ElMessage.success('文件上传成功');
@@ -512,7 +505,6 @@ export default {
       };
       input.click();
     },
-    // 上传整个文件夹（2.7）
     async uploadFolderDocuments() {
       const input = document.createElement('input');
       input.type = 'file';
@@ -527,35 +519,17 @@ export default {
           const parts = files[0].webkitRelativePath.split('/');
           if (parts.length > 1) folderName = parts[0];
         }
-        // 弹窗询问 recursive 和 force_reprocess
-        let recursive = false;
-        let forceReprocess = false;
-        try {
-          recursive = await this.$confirm('是否递归处理子文件夹？', '递归处理', {
-            confirmButtonText: '是',
-            cancelButtonText: '否',
-            distinguishCancelAndClose: true,
-            type: 'info',
-          }).then(() => true).catch(() => false);
-        } catch (e) { recursive = false; }
-        try {
-          forceReprocess = await this.$confirm('是否强制重新处理同名文件？', '强制处理', {
-            confirmButtonText: '是',
-            cancelButtonText: '否',
-            distinguishCancelAndClose: true,
-            type: 'warning',
-          }).then(() => true).catch(() => false);
-        } catch (e) { forceReprocess = false; }
         this.isLoadingTable = true;
         const loadingInstance = ElLoading.service({ text: '正在上传文件夹...' });
         try {
-          // 只传文件夹名、recursive、force_reprocess
-          const payload = {
-            directory_path: folderName,
-            recursive: recursive,
-            force_reprocess: forceReprocess
-          };
-          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-documents`, payload);
+          const formData = new FormData();
+          for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+          }
+          if (folderName) formData.append('folder_name', folderName);
+          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-documents`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
           const data = response.data;
           if (data.success) {
             ElMessage.success('文件夹上传成功');
@@ -572,7 +546,6 @@ export default {
       };
       input.click();
     },
-    // 上传单个数据库文件（2.8）
     async uploadDatabaseFile() {
       const input = document.createElement('input');
       input.type = 'file';
@@ -580,25 +553,22 @@ export default {
       input.onchange = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
-        // 弹窗询问 force_reprocess
-        let forceReprocess = false;
-        try {
-          forceReprocess = await this.$confirm('是否强制重新处理同名数据库文件？', '强制处理', {
-            confirmButtonText: '是',
-            cancelButtonText: '否',
-            distinguishCancelAndClose: true,
-            type: 'warning',
-          }).then(() => true).catch(() => false);
-        } catch (e) { forceReprocess = false; }
+        // 获取文件夹名（单文件时取webkitRelativePath的第一个目录，否则为空）
+        let folderName = '';
+        if (file.webkitRelativePath) {
+          const parts = file.webkitRelativePath.split('/');
+          if (parts.length > 1) folderName = parts[0];
+        }
         this.isLoadingTable = true;
         const loadingInstance = this.$loading ? this.$loading({ text: '正在上传数据库文件...' }) : ElLoading.service({ text: '正在上传数据库文件...' });
         try {
-          // 只传文件名和force_reprocess
-          const payload = {
-            excel_file_path: file.name,
-            force_reprocess: forceReprocess
-          };
-          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-database`, payload);
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('relative_path', file.name);
+          if (folderName) formData.append('folder_name', folderName);
+          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-database`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
           const data = response.data;
           if (data.success) {
             ElMessage.success('数据库文件上传成功');
