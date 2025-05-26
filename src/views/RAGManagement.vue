@@ -11,23 +11,6 @@
     <h1 style="font-size: 24px; margin-bottom: 20px;">📁 RAG 模块管理</h1>
     
     <div style="display:flex; justify-content: space-between; align-items: center; height: 50px; margin-bottom: 20px;">
-      <div style="display: flex; align-items: center;">
-        <!-- Button 1: 上传向量化检索文档 -->
-          <el-button type="primary" style="margin-left: 10px;" @click="uploadSingleDocument">上传向量化检索文档</el-button>
-        <!-- Button 2: 上传数据库文件 -->
-        <el-button type="primary" style="margin-left: 10px;" @click="uploadDatabaseFile"><el-icon><Coin /></el-icon> 上传数据库文件</el-button>
-        <!-- Button 3: 上传整个文件夹 -->
-        <el-button class="yellow-action-btn" style="margin-left: 10px;" @click="uploadFolderDocuments">上传整个文件夹</el-button>
-        <!-- 新增：排序/清空按钮组 -->
-        <div style="display: flex; align-items: center; margin-left: 30px;">
-          <el-button class="yellow-side-btn" @click="sortByFileSize" style="margin-left: 0;">按文件大小排序</el-button>
-          <el-button class="yellow-side-btn" @click="sortByTime" style="margin-left: 10px;">按上传时间排序</el-button>
-          <el-button class="custom-clear-all-btn" @click="clearAllDocuments" style="margin-left: 10px;">
-            <el-icon><DeleteFilled /></el-icon> 清空所有文件
-          </el-button>
-        </div>
-      </div>
-
       <div style="height: 50px; margin-right: 20px;">
         <el-input
           v-model="searchQuery"
@@ -46,42 +29,56 @@
     </div>
 
     <el-card class="table-container">
-      <!-- 数据库文件显示区 -->
-      <div style="font-weight:bold;margin-bottom:4px;">数据库文件显示：</div>
-      <!-- 大表格：数据库 recentTables -->
-      <el-table :data="recentTables" border style="width: 100%; margin-bottom: 10px;">
-        <el-table-column prop="table_name" label="数据库表名" width="200" align="center" />
-        <el-table-column prop="source_file" label="excel文件名" width="200" align="center" />
-        <el-table-column prop="import_time" label="添加时间" width="200" align="center" />
-        <el-table-column prop="sheet_name" label="原excel表名" width="200" align="center" />
-        <el-table-column label="操作" width="120" align="center">
-          <template #default="scope">
-            <el-button size="small" class="custom-delete-btn" @click="deleteDatabaseTable(scope.row.table_name)">
-              <el-icon><RemoveFilled /></el-icon> 删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <!-- 大表格：数据库文件显示区 -->
+      <div style="display: flex; align-items: center; margin-bottom:4px;">
+        <span style="font-weight:bold;">数据库文件显示：</span>
+      </div>
+      <div style="display: flex; margin-top: 5px; margin-bottom: 10px;">
+        <el-table :data="recentTables" border style="width: 100%; margin-bottom: 10px; font-size: 16px; flex-grow: 1;" size="default" :header-row-style="{height:'45px'}">
+          <el-table-column prop="table_name" label="数据库表名" :min-width="getColWidth(0, 5)" :header-cell-style="blueHeaderStyle" align="center"></el-table-column>
+          <el-table-column prop="source_file" label="excel文件名" :min-width="getColWidth(1, 5)" :header-cell-style="blueHeaderStyle" align="center"></el-table-column>
+          <el-table-column prop="import_time" label="添加时间" :min-width="getColWidth(2, 5)" :header-cell-style="blueHeaderStyle" sortable align="center">
+            <template #header>
+              添加时间 <el-icon style="vertical-align: middle;"><Bottom /></el-icon>
+            </template>
+          </el-table-column>
+          <el-table-column prop="sheet_name" label="原excel表名" :min-width="getColWidth(3, 5)" :header-cell-style="blueHeaderStyle" align="center"></el-table-column>
+          <el-table-column label="操作" :min-width="getColWidth(4, 5)" align="center">
+            <template #default="scope">
+              <el-button size="small" class="custom-delete-btn" @click="deleteDatabaseTable(scope.row.table_name)">
+                <el-icon><RemoveFilled /></el-icon> 删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
       <!-- 小表格：数据库统计 -->
       <div style="font-weight:bold;margin-bottom:4px;">数据库文件显示：</div>
-      <el-table :data="[databaseStats]" border style="width: 100%; margin-bottom: 20px;">
-        <el-table-column prop="totalTables" label="总表数" width="120" align="center" />
-      </el-table>
-
-      <!-- 向量搜索文件显示区（原有内容不变） -->
-      <div class="info-header-grid">
-        <span class="info-header-label first-label">向量搜索文件显示：</span>
-        <!-- These are actual column headers in the table below, this is just a label -->
+      <div style="position: relative; display: flex; margin-top: 5px; margin-bottom: 40px;">
+        <el-table :data="[databaseStats]" border style="width: 100%; margin-bottom: 10px;">
+          <el-table-column prop="totalTables" label="总表数" width="120" align="center" />
+        </el-table>
+        <!-- 数据库按钮区，绝对定位在表格右下角 -->
+        <div class="table-footer-btns db-btns">
+          <el-button type="primary" @click="uploadDatabaseFile"><el-icon><Coin /></el-icon> 上传数据库文件</el-button>
+          <el-button class="custom-clear-all-btn" @click="deleteAllDatabaseTables" style="margin-left: 10px;">
+            <el-icon><DeleteFilled /></el-icon> 清空所有数据库文件
+          </el-button>
+        </div>
       </div>
-      
-      <div style="display: flex; margin-top: 5px;">
+
+      <!-- 向量搜索文件显示区 -->
+      <div style="display: flex; align-items: center; margin-bottom:4px; margin-top: 60px;">
+        <span style="font-weight:bold;">向量搜索文件显示：</span>
+      </div>
+      <div style="display: flex; margin-top: 5px; margin-bottom: 10px;">
         <template v-if="!showVectorFiles">
           <el-table :data="recentTables" border style="width: 100%; margin-bottom: 10px;">
-            <el-table-column prop="table_name" label="数据库表名" width="200" align="center" />
-            <el-table-column prop="excel_file_name" label="excel文件名" width="200" align="center" />
-            <el-table-column prop="added_time" label="添加时间" width="200" align="center" />
-            <el-table-column prop="original_excel_name" label="原excel表名" width="200" align="center" />
-            <el-table-column label="操作" width="120" align="center">
+            <el-table-column prop="table_name" label="数据库表名" :min-width="getColWidth(0, 5)" align="center" />
+            <el-table-column prop="source_file" label="excel文件名" :min-width="getColWidth(1, 5)" align="center" />
+            <el-table-column prop="import_time" label="添加时间" :min-width="getColWidth(2, 5)" align="center" />
+            <el-table-column prop="sheet_name" label="原excel表名" :min-width="getColWidth(3, 5)" align="center" />
+            <el-table-column label="操作" :min-width="getColWidth(4, 5)" align="center">
               <template #default="scope">
                 <el-button size="small" class="custom-delete-btn" @click="deleteDatabaseTable(scope.row.table_name)">
                   <el-icon><RemoveFilled /></el-icon> 删除
@@ -92,22 +89,18 @@
         </template>
         <template v-else>
           <el-table :data="paginatedDocuments" style="width: 100%; font-size: 16px; flex-grow: 1;" size="default" :header-row-style="{height:'45px'}">
-            <el-table-column prop="name" label="文件名 (路径)" width="280" :header-cell-style="blueHeaderStyle" align="center"></el-table-column>
-            <el-table-column prop="doc_type_display" label="文档块数" width="150" :header-cell-style="blueHeaderStyle" align="center"></el-table-column>
-            <el-table-column prop="date" label="添加时间" width="230" :header-cell-style="blueHeaderStyle" sortable align="center">
+            <el-table-column prop="name" label="文件名 (路径)" :min-width="getColWidth(0, 5)" :header-cell-style="blueHeaderStyle" align="center"></el-table-column>
+            <el-table-column prop="doc_type_display" label="文档块数" :min-width="getColWidth(1, 5)" :header-cell-style="blueHeaderStyle" align="center"></el-table-column>
+            <el-table-column prop="date" label="添加时间" :min-width="getColWidth(2, 5)" :header-cell-style="blueHeaderStyle" sortable align="center">
               <template #header>
                 添加时间 <el-icon style="vertical-align: middle;"><Bottom /></el-icon>
               </template>
             </el-table-column>
-            <el-table-column prop="size_display" label="文件大小" width="150" :header-cell-style="blueHeaderStyle" align="center"></el-table-column>
-            <el-table-column label="操作" width="150" align="center">
+            <el-table-column prop="size_display" label="文件大小" :min-width="getColWidth(3, 5)" :header-cell-style="blueHeaderStyle" align="center"></el-table-column>
+            <el-table-column label="操作" :min-width="getColWidth(4, 5)" align="center">
               <template #default="scope">
-                <el-button
-                  @click="deleteDocument(scope.row.id, scope.row.name)"
-                  class="custom-delete-btn"
-                  size="small"
-                >
-                  <el-icon><RemoveFilled /></el-icon> 删除
+                <el-button size="small" class="custom-delete-btn" @click="deleteDocument(scope.row.id, scope.row.name)">
+                  <el-icon><RemoveFilled /></el-icon> 删除
                 </el-button>
               </template>
             </el-table-column>
@@ -115,25 +108,33 @@
         </template>
       </div>
 
-      <div class="footer-stats-container">
-        <div class="stats-column">
-          <template v-if="showVectorFiles">
-            <div style="font-weight:bold;margin-bottom:4px;">向量储存文件显示：</div>
-            <el-table :data="[vectorStats]" border style="width: 100%; margin-bottom: 10px;">
-              <el-table-column prop="totalChunks" label="总分块数" width="100" align="center" />
-              <el-table-column prop="totalFiles" label="总文件数" width="100" align="center" />
-              <el-table-column prop="pdfCount" label="pdf文件" width="100" align="center" />
-              <el-table-column prop="txtCount" label="txt文件" width="100" align="center" />
-              <el-table-column prop="docxCount" label="docx文件" width="100" align="center" />
-              <el-table-column prop="csvCount" label="csv文件" width="100" align="center" />
-            </el-table>
-          </template>
-          <template v-else>
-            <div style="font-weight:bold;margin-bottom:4px;">数据库文件显示：</div>
-            <el-table :data="[databaseStats]" border style="width: 100%; margin-bottom: 10px;">
-              <el-table-column prop="totalTables" label="总表数" width="120" align="center" />
-            </el-table>
-          </template>
+       <!-- 向量储存文件显示区 -->
+      <div style="font-weight:bold;margin-bottom:4px;">向量储存文件显示：</div>
+      <div style="position: relative; display: flex; margin-top: 5px; margin-bottom: 40px;">
+        <template v-if="showVectorFiles">
+          <el-table :data="[vectorStats]" border style="width: 100%; margin-bottom: 10px;">
+            <el-table-column prop="totalChunks" label="总分块数" width="100" align="center" />
+            <el-table-column prop="totalFiles" label="总文件数" width="100" align="center" />
+            <el-table-column prop="pdfCount" label="pdf文件" width="100" align="center" />
+            <el-table-column prop="txtCount" label="txt文件" width="100" align="center" />
+            <el-table-column prop="docxCount" label="docx文件" width="100" align="center" />
+            <el-table-column prop="csvCount" label="csv文件" width="100" align="center" />
+          </el-table>
+        </template>
+        <template v-else>
+          <el-table :data="[databaseStats]" border style="width: 100%; margin-bottom: 10px;">
+            <el-table-column prop="totalTables" label="总表数" width="120" align="center" />
+          </el-table>
+        </template>
+        <!-- 向量按钮区，绝对定位在表格右下角 -->
+        <div class="table-footer-btns vector-btns">
+          <el-button type="primary" @click="uploadSingleDocument">上传向量化检索文档</el-button>
+          <el-button class="yellow-action-btn" style="margin-left: 10px;" @click="uploadFolderDocuments">上传整个文件夹</el-button>
+          <el-button class="yellow-side-btn" @click="sortByFileSize" style="margin-left: 10px;">按文件大小排序</el-button>
+          <el-button class="yellow-side-btn" @click="sortByTime" style="margin-left: 10px;">按上传时间排序</el-button>
+          <el-button class="custom-clear-all-btn" @click="deleteAllVectorFiles" style="margin-left: 10px;">
+            <el-icon><DeleteFilled /></el-icon> 清空所有向量文件
+          </el-button>
         </div>
       </div>
       
@@ -166,24 +167,18 @@ export default {
   },
   data() {
     return {
+      recentTables: [
+        
+       ], // 新增：数据库 recent_tables
+      databaseStats: {
+      
+      },
       documents: [
-        { id: '1', name: '参考文件1.pdf', doc_type_display: 'pdf', date: '2025-03-19 10:30:45', size_display: 'A' },
-        { id: '2', name: '参考文件2.docx', doc_type_display: 'docx', date: '2025-03-18 14:22:31', size_display: 'A' },
-        { id: '3', name: '参考文件3.csv', doc_type_display: 'csv', date: '2025-03-17 09:10:12', size_display: 'A' },
-        { id: '4', name: '参考文件4.txt', doc_type_display: 'txt', date: '2025-03-16 16:55:00', size_display: 'A' },
+
       ],
       vectorStats: {
-        totalChunks: 120,
-        totalFiles: 4,
-        pdfCount: 1,
-        txtCount: 1,
-        docxCount: 1,
-        csvCount: 1,
+       
       },
-      databaseStats: {
-        totalTables: 12,
-      },
-      recentTables: [], // 新增：数据库 recent_tables
       currentPage: 1,
       itemsPerPage: 4,
       searchQuery: '',
@@ -289,12 +284,20 @@ export default {
         this.isLoadingTable = true;
         const loadingInstance = ElLoading.service({ text: '正在删除...' });
         try {
-          // Mock API Call
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          this.documents = this.documents.filter(doc => doc.id !== fileId);
-          this.vectorStats.totalFiles -=1; // Adjust stats
-          // Adjust specific file type counts if necessary
-          ElMessage.success(`文件 "${fileName}" 删除成功`);
+          // 实际API调用
+          const response = await axios.delete(`${API_BASE_URL}/rag-management/delete-file`, {
+            data: { file_id: fileId, file_name: fileName }
+          });
+          const data = response.data;
+          if (data.success) {
+            ElMessage.success(`文件 "${fileName}" 删除成功`);
+            // 删除后自动刷新RAG数据
+            await this.fetchRagManagementData && this.fetchRagManagementData();
+          } else {
+            ElMessage.error(data.message || '文件删除失败');
+          }
+        } catch (error) {
+          ElMessage.error('文件删除请求失败: ' + error.message);
         } finally {
           this.isLoadingTable = false;
           loadingInstance.close();
@@ -309,12 +312,17 @@ export default {
         this.isLoadingTable = true;
         const loadingInstance = ElLoading.service({ text: '正在清空...' });
         try {
-          // Mock API Call
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          this.documents = [];
-          this.vectorStats = { totalChunks: 0, totalFiles: 0, pdfCount: 0, txtCount: 0, docxCount: 0, csvCount: 0 };
-          // this.databaseStats = { totalTables: 0 }; // Reset if needed
-          ElMessage.success('所有文件已清空');
+          // 实际API调用
+          const response = await axios.delete(`${API_BASE_URL}/rag-management/delete-all-file`);
+          const data = response.data;
+          if (data.success) {
+            ElMessage.success('所有文件已清空');
+            await this.fetchRagManagementData && this.fetchRagManagementData();
+          } else {
+            ElMessage.error(data.message || '清空文件失败');
+          }
+        } catch (error) {
+          ElMessage.error('清空文件请求失败: ' + error.message);
         } finally {
           this.isLoadingTable = false;
           loadingInstance.close();
@@ -327,6 +335,7 @@ export default {
     async loadRagData() {
       this.showVectorFiles = true;
       await this.fetchRagManagementData();
+      await this.fetchDatabaseTables();
     },
     // 获取RAG文档列表及统计（2.1）
     async fetchRagManagementData() {
@@ -357,20 +366,23 @@ export default {
         ElMessage.error('获取RAG文档列表失败: ' + error.message);
       }
     },
-    // 获取数据库表信息
+    // 获取数据库表信息（改为从 /rag-management 获取 json 数据）
     async fetchDatabaseTables() {
       this.showVectorFiles = false;
       try {
-        const response = await axios.get(`${API_BASE_URL}/rag-management/database`);
+        const response = await axios.get(`${API_BASE_URL}/rag-management`);
         const data = response.data;
-        // 解析后端返回的 database status 数据
-        const dbStatus = data.database_status || {};
-        this.databaseStats.totalTables = dbStatus.table_count;
-        this.recentTables = (dbStatus.tables || []).map(t => ({
-          table_name: t.table_name,
-          source_file: t.source_file,
-          import_time: t.import_time,
-          sheet_name: t.sheet_name
+        // 兼容后端返回结构，优先 database_status
+        const dbStatus = data.database_status || data;
+        // recentTables 兼容多种字段
+        const tables = dbStatus.tables || dbStatus.recent_tables || [];
+        const table_count = dbStatus.table_count || dbStatus.totalTables || tables.length || 0;
+        this.databaseStats.totalTables = table_count;
+        this.recentTables = tables.map(t => ({
+          table_name: t.table_name || t.name || t.tableName || '',
+          source_file: t.source_file || t.excel_file_name || t.file_name || '',
+          import_time: t.import_time || t.added_time || t.create_time || '',
+          sheet_name: t.sheet_name || t.original_excel_name || ''
         }));
       } catch (error) {
         ElMessage.error('获取数据库表失败: ' + error.message);
@@ -379,18 +391,32 @@ export default {
     // 按文件大小排序（2.2）
     async sortByFileSize() {
       try {
+        // 刷新页面并按 largest_files 顺序展示
         const response = await axios.get(`${API_BASE_URL}/rag-management`);
         const data = response.data;
-        // 更新 documents 数据为 largest_files
-        this.documents = (data.largest_files || []).map(f => ({
-          id: f.path,
-          name: f.path,
-          doc_type_display: f.path.split('.').pop() || 'unknown',
-          date: f.last_processed?.replace('T', ' ') || '',
-          size_display: f.size_bytes ? (f.size_bytes / 1024 / 1024).toFixed(2) + ' MB' : '',
+        // 兼容后端返回结构：largest_files 可能在 data.largest_files 或 data.rag_status.largest_files
+        const files = (data.largest_files || data.rag_status?.largest_files || []);
+        this.documents = files.map(f => ({
+          id: f.path || f.name || f.file_name || '',
+          name: f.path || f.name || f.file_name || '',
+          doc_type_display: f.chunk_count || f.type || '',
+          date: f.last_processed?.replace('T', ' ') || f.date || '',
+          size_display: f.size_bytes ? (f.size_bytes / 1024 / 1024).toFixed(2) + ' MB' : (f.size || ''),
           chunk_count: f.chunk_count
         }));
-        this.showVectorFiles = true; // 确保展示向量搜索文件表格
+        this.showVectorFiles = true;
+        this.searchQuery = '';
+        this.currentPage = 1;
+        // 同步刷新统计信息
+        const ragStatus = data.rag_status || {};
+        this.vectorStats.totalChunks = ragStatus.document_count;
+        this.vectorStats.totalFiles = ragStatus.file_count;
+        this.vectorStats.pdfCount = ragStatus.file_type_counts?.pdf || 0;
+        this.vectorStats.txtCount = ragStatus.file_type_counts?.txt || 0;
+        this.vectorStats.docxCount = ragStatus.file_type_counts?.docx || 0;
+        this.vectorStats.csvCount = ragStatus.file_type_counts?.csv || 0;
+        // 强制刷新表格
+        this.$forceUpdate && this.$forceUpdate();
       } catch (error) {
         ElMessage.error('按文件大小排序失败: ' + error.message);
       }
@@ -399,18 +425,32 @@ export default {
     // 按时间排序（2.2）
     async sortByTime() {
       try {
+        // 刷新页面并按 recent_files 顺序展示
         const response = await axios.get(`${API_BASE_URL}/rag-management`);
         const data = response.data;
-        // 更新 documents 数据为 recent_files
-        this.documents = (data.recent_files || []).map(f => ({
-          id: f.path,
-          name: f.path,
-          doc_type_display: f.path.split('.').pop() || 'unknown',
-          date: f.last_processed?.replace('T', ' ') || '',
-          size_display: f.size_bytes ? (f.size_bytes / 1024 / 1024).toFixed(2) + ' MB' : '',
+        // 兼容后端返回结构：recent_files 可能在 data.recent_files 或 data.rag_status.recent_files
+        const files = (data.recent_files || data.rag_status?.recent_files || []);
+        this.documents = files.map(f => ({
+          id: f.path || f.name || f.file_name || '',
+          name: f.path || f.name || f.file_name || '',
+          doc_type_display: f.chunk_count || f.type || '',
+          date: f.last_processed?.replace('T', ' ') || f.date || '',
+          size_display: f.size_bytes ? (f.size_bytes / 1024 / 1024).toFixed(2) + ' MB' : (f.size || ''),
           chunk_count: f.chunk_count
         }));
-        this.showVectorFiles = true; // 确保展示向量搜索文件表格
+        this.showVectorFiles = true;
+        this.searchQuery = '';
+        this.currentPage = 1;
+        // 同步刷新统计信息
+        const ragStatus = data.rag_status || {};
+        this.vectorStats.totalChunks = ragStatus.document_count;
+        this.vectorStats.totalFiles = ragStatus.file_count;
+        this.vectorStats.pdfCount = ragStatus.file_type_counts?.pdf || 0;
+        this.vectorStats.txtCount = ragStatus.file_type_counts?.txt || 0;
+        this.vectorStats.docxCount = ragStatus.file_type_counts?.docx || 0;
+        this.vectorStats.csvCount = ragStatus.file_type_counts?.csv || 0;
+        // 强制刷新表格
+        this.$forceUpdate && this.$forceUpdate();
       } catch (error) {
         ElMessage.error('按时间排序失败: ' + error.message);
       }
@@ -419,7 +459,7 @@ export default {
     // 查看数据库文件（2.4）
     async fetchDatabaseTables() {
       try {
-        const response = await axios.get(`${API_BASE_URL}/rag-management/database`);
+        const response = await axios.get(`${API_BASE_URL}/rag-management`);
         const data = response.data;
         this.databaseStats.totalTables = data.table_count;
         // recent_tables 可用于表格展示
@@ -431,22 +471,31 @@ export default {
 
     // 上传单个文本文件（2.6）
     async uploadSingleDocument() {
-      // 打开文件选择框，选择单个文件
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.pdf,.docx,.txt,.csv';
       input.onchange = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
+        // 弹窗询问 force_reprocess
+        let forceReprocess = false;
+        try {
+          forceReprocess = await this.$confirm('是否强制重新处理同名文件？', '强制处理', {
+            confirmButtonText: '是',
+            cancelButtonText: '否',
+            distinguishCancelAndClose: true,
+            type: 'warning',
+          }).then(() => true).catch(() => false);
+        } catch (e) { forceReprocess = false; }
         this.isLoadingTable = true;
         const loadingInstance = ElLoading.service({ text: '正在上传文件...' });
         try {
-          const formData = new FormData();
-          formData.append('file', file);
-          // 假设后端接口为 /rag-management/upload-document
-          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-document`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
+          // 只传文件名和force_reprocess
+          const payload = {
+            file_path: file.name,
+            force_reprocess: forceReprocess
+          };
+          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-document`, payload);
           const data = response.data;
           if (data.success) {
             ElMessage.success('文件上传成功');
@@ -463,10 +512,8 @@ export default {
       };
       input.click();
     },
-
     // 上传整个文件夹（2.7）
     async uploadFolderDocuments() {
-      // 打开文件夹选择框，选择整个文件夹
       const input = document.createElement('input');
       input.type = 'file';
       input.webkitdirectory = true;
@@ -474,17 +521,41 @@ export default {
       input.onchange = async (event) => {
         const files = event.target.files;
         if (!files || files.length === 0) return;
+        // 获取文件夹名（取第一个文件的webkitRelativePath的第一个目录）
+        let folderName = '';
+        if (files[0] && files[0].webkitRelativePath) {
+          const parts = files[0].webkitRelativePath.split('/');
+          if (parts.length > 1) folderName = parts[0];
+        }
+        // 弹窗询问 recursive 和 force_reprocess
+        let recursive = false;
+        let forceReprocess = false;
+        try {
+          recursive = await this.$confirm('是否递归处理子文件夹？', '递归处理', {
+            confirmButtonText: '是',
+            cancelButtonText: '否',
+            distinguishCancelAndClose: true,
+            type: 'info',
+          }).then(() => true).catch(() => false);
+        } catch (e) { recursive = false; }
+        try {
+          forceReprocess = await this.$confirm('是否强制重新处理同名文件？', '强制处理', {
+            confirmButtonText: '是',
+            cancelButtonText: '否',
+            distinguishCancelAndClose: true,
+            type: 'warning',
+          }).then(() => true).catch(() => false);
+        } catch (e) { forceReprocess = false; }
         this.isLoadingTable = true;
         const loadingInstance = ElLoading.service({ text: '正在上传文件夹...' });
         try {
-          const formData = new FormData();
-          for (let i = 0; i < files.length; i++) {
-            formData.append('files', files[i]);
-          }
-          // 假设后端接口为 /rag-management/upload-documents
-          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-documents`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
+          // 只传文件夹名、recursive、force_reprocess
+          const payload = {
+            directory_path: folderName,
+            recursive: recursive,
+            force_reprocess: forceReprocess
+          };
+          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-documents`, payload);
           const data = response.data;
           if (data.success) {
             ElMessage.success('文件夹上传成功');
@@ -501,32 +572,36 @@ export default {
       };
       input.click();
     },
-
     // 上传单个数据库文件（2.8）
     async uploadDatabaseFile() {
-      // 弹出文件选择框
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.xls,.xlsx,.csv';
       input.onchange = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
-        // 仅传递文件名（相对路径，不含绝对路径）
-        const relativePath = file.name;
+        // 弹窗询问 force_reprocess
+        let forceReprocess = false;
+        try {
+          forceReprocess = await this.$confirm('是否强制重新处理同名数据库文件？', '强制处理', {
+            confirmButtonText: '是',
+            cancelButtonText: '否',
+            distinguishCancelAndClose: true,
+            type: 'warning',
+          }).then(() => true).catch(() => false);
+        } catch (e) { forceReprocess = false; }
         this.isLoadingTable = true;
         const loadingInstance = this.$loading ? this.$loading({ text: '正在上传数据库文件...' }) : ElLoading.service({ text: '正在上传数据库文件...' });
         try {
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('relative_path', relativePath); // 传递相对路径字段
-          // 假设后端接口为 /rag-management/upload-database
-          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-database`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
+          // 只传文件名和force_reprocess
+          const payload = {
+            excel_file_path: file.name,
+            force_reprocess: forceReprocess
+          };
+          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-database`, payload);
           const data = response.data;
           if (data.success) {
             ElMessage.success('数据库文件上传成功');
-            // 上传后可自动刷新数据库表格
             this.fetchDatabaseTables && this.fetchDatabaseTables();
           } else {
             ElMessage.error(data.message || '数据库文件上传失败');
@@ -561,15 +636,30 @@ export default {
     // 删除全部向量检索文件（2.10）
     async deleteAllVectorFiles() {
       try {
-        const response = await axios.delete(`${API_BASE_URL}/rag-management/delete-all-file`);
-        const data = response.data;
-        if (data.success) {
-          ElMessage.success(data.message);
-        } else {
-          ElMessage.error('清空向量检索文件失败');
+        await this.$confirm('你确定要清空所有向量检索文件吗？这将无法恢复！', '确认清空', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        });
+        this.isLoadingTable = true;
+        const loadingInstance = this.$loading ? this.$loading({ text: '正在清空向量文件...' }) : ElLoading.service({ text: '正在清空向量文件...' });
+        try {
+          const response = await axios.delete(`${API_BASE_URL}/rag-management/delete-all-file`);
+          const data = response.data;
+          if (data.success) {
+            ElMessage.success(data.message || '所有向量文件已清空');
+            await this.fetchRagManagementData && this.fetchRagManagementData();
+          } else {
+            ElMessage.error(data.message || '清空向量文件失败');
+          }
+        } catch (error) {
+          ElMessage.error('清空向量文件请求失败: ' + error.message);
+        } finally {
+          this.isLoadingTable = false;
+          loadingInstance.close();
         }
-      } catch (error) {
-        ElMessage.error('清空向量检索文件请求失败: ' + error.message);
+      } catch (e) {
+        if (e !== 'cancel' && e !== undefined) ElMessage.info('操作已取消');
       }
     },
 
@@ -582,6 +672,9 @@ export default {
         const data = response.data;
         if (data.success) {
           ElMessage.success(data.message);
+          // 删除后自动刷新数据库表格和RAG文档表格
+          await this.fetchDatabaseTables && this.fetchDatabaseTables();
+          await this.fetchRagManagementData && this.fetchRagManagementData();
         } else {
           ElMessage.error(data.message || '数据库表删除失败');
         }
@@ -593,16 +686,39 @@ export default {
     // 删除全部数据库表（2.12）
     async deleteAllDatabaseTables() {
       try {
-        const response = await axios.delete(`${API_BASE_URL}/rag-management/delete-all-database`);
-        const data = response.data;
-        if (data.success) {
-          ElMessage.success('全部数据库表已删除');
-        } else {
-          ElMessage.error('全部数据库表删除失败');
+        await this.$confirm('你确定要清空所有数据库表吗？这将无法恢复！', '确认清空', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        });
+        this.isLoadingTable = true;
+        const loadingInstance = this.$loading ? this.$loading({ text: '正在清空数据库表...' }) : ElLoading.service({ text: '正在清空数据库表...' });
+        try {
+          const response = await axios.delete(`${API_BASE_URL}/rag-management/delete-all-database`);
+          const data = response.data;
+          if (data.success) {
+            ElMessage.success('全部数据库表已删除');
+            await this.fetchDatabaseTables && this.fetchDatabaseTables();
+            await this.fetchRagManagementData && this.fetchRagManagementData();
+          } else {
+            ElMessage.error(data.message || '全部数据库表删除失败');
+          }
+        } catch (error) {
+          ElMessage.error('全部数据库表删除请求失败: ' + error.message);
+        } finally {
+          this.isLoadingTable = false;
+          loadingInstance.close();
         }
-      } catch (error) {
-        ElMessage.error('全部数据库表删除请求失败: ' + error.message);
+      } catch (e) {
+        if (e !== 'cancel' && e !== undefined) ElMessage.info('操作已取消');
       }
+    },
+    getColWidth(index, total) {
+      // 动态分配列宽，保证表格占满整行
+      // index: 当前列索引，total: 总列数
+      // 例如5列，每列平均分配20%，最后一列略宽
+      if (index === total - 1) return `${Math.round(100 / total) + 5}%`;
+      return `${Math.floor(100 / total)}%`;
     },
   },
 };
@@ -752,5 +868,14 @@ export default {
 }
 .el-table .el-icon {
     vertical-align: middle;
+}
+
+.table-footer-btns {
+  position: absolute;
+  right: 0;
+  bottom: -50px;
+  display: flex;
+  gap: 10px;
+  z-index: 2;
 }
 </style>
