@@ -514,20 +514,72 @@ export default {
           const parts = files[0].webkitRelativePath.split('/');
           if (parts.length > 1) folderName = parts[0];
         }
-        this.isLoadingTable = true;
-        const loadingInstance = ElLoading.service({ text: '正在上传文件夹...' });
+        if (!folderName) {
+          ElMessage.error('请选择有效的文件夹');
+          return;
+        }
+        // 弹窗询问 recursive
+        let recursive = false;
         try {
-          const formData = new FormData();
-          for (let i = 0; i < files.length; i++) {
-            formData.append('files', files[i]);
-          }
-          if (folderName) formData.append('folder_name', folderName);
-          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-documents`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
+          await this.$confirm(
+            `是否递归处理子文件夹？<br><span style='color:#888'>(选择“确定”递归处理，选择“取消”只处理当前文件夹)</span>`,
+            '文件夹上传选项',
+            {
+              confirmButtonText: '递归处理',
+              cancelButtonText: '只处理当前文件夹',
+              dangerouslyUseHTMLString: true,
+              type: 'info',
+            }
+          );
+          recursive = true;
+        } catch (e) {
+          recursive = false;
+        }
+        // 弹窗询问 force_reprocess
+        let forceReprocess = false;
+        try {
+          await this.$confirm(
+            `是否强制重新处理同名文件？<br><span style='color:#888'>(选择“确定”将强制处理，选择“取消”则只处理新文件)</span>`,
+            '文件夹上传选项',
+            {
+              confirmButtonText: '强制处理',
+              cancelButtonText: '只处理新文件',
+              dangerouslyUseHTMLString: true,
+              type: 'warning',
+            }
+          );
+          forceReprocess = true;
+        } catch (e) {
+          forceReprocess = false;
+        }
+        this.isLoadingTable = true;
+        const loadingInstance = this.$loading ? this.$loading({ text: '正在上传文件夹...' }) : ElLoading.service({ text: '正在上传文件夹...' });
+        try {
+          const payload = {
+            directory_path: folderName,
+            recursive: recursive,
+            force_reprocess: forceReprocess
+          };
+          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-documents`, payload);
           const data = response.data;
           if (data.success) {
-            ElMessage.success('文件夹上传成功');
+            let msg = `${data.message || '文件夹上传成功'}<br>`;
+            msg += `总文件数: ${data.total_files_found ?? '-'}<br>`;
+            msg += `成功: ${data.processed_successfully ?? '-'}，失败: ${data.failed ?? '-'}，跳过: ${data.skipped ?? '-'}<br>`;
+            if (data.files_by_type) {
+              msg += '各类型文件数：';
+              for (const [type, count] of Object.entries(data.files_by_type)) {
+                msg += `${type}: ${count} `;
+              }
+              msg += '<br>';
+            }
+            if (data.failures && data.failures.length > 0) {
+              msg += '<span style="color:#c00">失败文件：</span><br>';
+              data.failures.forEach(f => {
+                msg += `${f.file}: ${f.error}<br>`;
+              });
+            }
+            ElMessageBox.alert(msg, '上传结果', { dangerouslyUseHTMLString: true });
             this.fetchRagManagementData && this.fetchRagManagementData();
           } else {
             ElMessage.error(data.message || '文件夹上传失败');
