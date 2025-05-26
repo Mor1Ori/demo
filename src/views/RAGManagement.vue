@@ -269,20 +269,29 @@ export default {
       ElMessage.info(`搜索 "${this.searchQuery}"... (前端筛选)`);
       this.currentPage = 1; // Reset to first page after search
     },
-    async deleteDocument(fileId, fileName) {
+    async deleteDocument(filePath) {
+      // 将每个 \ 替换为两个 \\
+      const safePath = filePath.replace(/\\/g, "\\\\");
       try {
-        await ElMessageBox.confirm(`你确定要删除文件 "${fileName}" 吗？`, '确认删除', { type: 'warning' });
+        await this.$confirm(`你确定要删除文件 "${filePath}" 吗？`, '确认删除', { type: 'warning' });
         this.isLoadingTable = true;
-        const loadingInstance = ElLoading.service({ text: '正在删除...' });
+        const loadingInstance = this.$loading ? this.$loading({ text: '正在删除...' }) : ElLoading.service({ text: '正在删除...' });
         try {
-          // 实际API调用
+          // 按接口文档：只传 file_path，路径已处理
           const response = await axios.delete(`${API_BASE_URL}/rag-management/delete-file`, {
-            data: { file_id: fileId, file_name: fileName }
+            data: { file_path: safePath }
           });
           const data = response.data;
           if (data.success) {
-            ElMessage.success(`文件 "${fileName}" 删除成功`);
-            // 删除后自动刷新RAG数据
+            // 展示 result.details
+            let msg = '';
+            if (data.result && Array.isArray(data.result.details)) {
+              data.result.details.forEach(detail => {
+                msg += `<b>${detail.file}</b> - <span style='color:${detail.status==='success'?'green':(detail.status==='not_found'?'#888':'#c00')};font-weight:bold;'>${detail.status}</span>：${detail.message}<br>`;
+              });
+            }
+            ElMessageBox.alert(msg || '文件删除成功', '删除结果', { dangerouslyUseHTMLString: true });
+            // 删除后自动刷新
             await this.fetchRagManagementData && this.fetchRagManagementData();
           } else {
             ElMessage.error(data.message || '文件删除失败');
@@ -633,20 +642,40 @@ export default {
       input.click();
     },
 
-    // 删除单个向量检索文件（2.9）
-    async deleteDocumentByPath(filePath) {
+    // 删除单个向量检索文件（2.9，接口文档实现）
+    async deleteDocument(filePath) {
       try {
-        const response = await axios.delete(`${API_BASE_URL}/rag-management/delete-file`, {
-          data: { file_path: filePath }
-        });
-        const data = response.data;
-        if (data.success) {
-          ElMessage.success('文件删除成功');
-        } else {
-          ElMessage.error('文件删除失败: ' + (data.result?.details?.[0]?.message || ''));
+        await this.$confirm(`你确定要删除文件 "${filePath}" 吗？`, '确认删除', { type: 'warning' });
+        this.isLoadingTable = true;
+        const loadingInstance = this.$loading ? this.$loading({ text: '正在删除...' }) : ElLoading.service({ text: '正在删除...' });
+        try {
+          // 按接口文档：只传 file_path
+          const response = await axios.delete(`${API_BASE_URL}/rag-management/delete-file`, {
+            data: { file_path: filePath }
+          });
+          const data = response.data;
+          if (data.success) {
+            // 展示 result.details
+            let msg = '';
+            if (data.result && Array.isArray(data.result.details)) {
+              data.result.details.forEach(detail => {
+                msg += `<b>${detail.file}</b> - <span style='color:${detail.status==='success'?'green':(detail.status==='not_found'?'#888':'#c00')};font-weight:bold;'>${detail.status}</span>：${detail.message}<br>`;
+              });
+            }
+            ElMessageBox.alert(msg || '文件删除成功', '删除结果', { dangerouslyUseHTMLString: true });
+            // 删除后自动刷新
+            await this.fetchRagManagementData && this.fetchRagManagementData();
+          } else {
+            ElMessage.error(data.message || '文件删除失败');
+          }
+        } catch (error) {
+          ElMessage.error('文件删除请求失败: ' + error.message);
+        } finally {
+          this.isLoadingTable = false;
+          loadingInstance.close();
         }
-      } catch (error) {
-        ElMessage.error('文件删除请求失败: ' + error.message);
+      } catch (e) {
+        if (e !== 'cancel' && e !== undefined) ElMessage.info('操作已取消');
       }
     },
 
