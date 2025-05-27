@@ -69,7 +69,7 @@
             <p>数据条目: {{ fileDetails.entries }}</p>
             <p>已包含字段: {{ fileDetails.fields }}</p>
             <p>最长字段长度: {{ fileDetails.maxLength }}</p>
-            <p>文件大小: {{ fileDetails.size }}</p>
+            <p>文件大小: {{ (fileDetails.size && typeof fileDetails.size === 'string') ? (parseFloat(fileDetails.size) / 1024).toFixed(2) + ' KB' : fileDetails.size }}</p>
             <div v-if="fileDetails.maxFieldLengths && Object.keys(fileDetails.maxFieldLengths).length" style="margin-top:8px;">
               <span style="font-weight:500;">各字段最大长度：</span>
               <span v-for="(len, key) in fileDetails.maxFieldLengths" :key="key" style="margin-right:12px;">{{ key }}: {{ len }}</span>
