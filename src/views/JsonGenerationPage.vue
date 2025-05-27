@@ -70,7 +70,10 @@
             <p>已包含字段: {{ fileDetails.fields }}</p>
             <p>最长字段长度: {{ fileDetails.maxLength }}</p>
             <p>文件大小: {{ fileDetails.size }}</p>
-            <p>......</p>
+            <div style="margin-top:8px;">
+              <span style="font-weight:500;">各字段最大长度：</span>
+              <span v-for="(len, key) in fileDetails.maxFieldLengths" :key="key" style="margin-right:12px;">{{ key }}: {{ len }}</span>
+            </div>
           </div>
           <div v-else class="file-details-preview file-details-bordered" style="color:#888; font-size:15px;">请先上传json文件，上传后将展示详细信息</div>
         </div>
@@ -147,15 +150,29 @@ export default {
     handleJsonFileUpload(file, fileList) {
       if (fileList.length > 0) {
         this.uploadedFile = fileList[0]; // Assuming limit is 1
-        // Simulate fetching file details
+        // 假设后端返回的json数据如下（实际应为接口返回）
+        const backendData = {
+          success: true,
+          total_entries: 4,
+          fields: ["instruction", "input", "output"],
+          max_field_lengths: {
+            instruction: 27,
+            input: 698,
+            output: 257
+          },
+          file_size_kb: 6326
+        };
+        // 动态展示
         this.fileDetails = {
-          entries: 143,
-          fields: 'instruction, input, history...',
-          maxLength: 280,
-          size: '24KB'
+          entries: backendData.total_entries,
+          fields: backendData.fields.join(', '),
+          maxLength: Math.max(...Object.values(backendData.max_field_lengths)),
+          size: backendData.file_size_kb + 'KB',
+          maxFieldLengths: backendData.max_field_lengths // 便于后续扩展
         };
       } else {
         this.uploadedFile = null;
+        this.fileDetails = { entries: 0, fields: 'N/A', maxLength: 0, size: '0KB', maxFieldLengths: {} };
       }
     },
     handleJsonFileRemove() {

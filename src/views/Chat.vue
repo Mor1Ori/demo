@@ -7,8 +7,14 @@
     <div class="top-bar">
       <h1 class="page-title">🤖 智能问答</h1>
       <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
-        <div class="model-api-info model-api-info-blue">
-          当前已加载的模型/api: {{ currentModelApiInfo || '未加载' }}
+        <div class="model-api-info model-api-info-blue" style="min-height:38px;display:flex;align-items:center;justify-content:center;">
+          <template v-if="isModelApiLoading">
+            <span class="model-api-loading-spinner"></span>
+            <span style="margin-left:10px;">正在连接模型/API，请稍候...</span>
+          </template>
+          <template v-else>
+            当前已加载的模型/api: {{ currentModelApiInfo || '未加载' }}
+          </template>
         </div>
       </div>
       <div class="top-right-actions">
@@ -157,6 +163,7 @@ export default {
       enableHistory: true,
       showModelThinking: false,
       showRagReference: false,
+      isModelApiLoading: false,
     };
   },
   computed: {
@@ -443,6 +450,7 @@ export default {
         ElMessage.warning('请先选择一个模型');
         return;
       }
+      this.isModelApiLoading = true;
       try {
         const response = await axios.post(`${API_BASE_URL}/chat/load_model`, {
           model_type: 'ollama',
@@ -450,17 +458,17 @@ export default {
           model_path: '',
           api: ''
         });
-
         const { success, message } = response.data;
         if (!success) {
           throw new Error(message || '模型加载失败');
         }
-
         this.currentModelApiInfo = `模型: ${this.selectedRemoteModel} (已加载)`;
         localStorage.setItem('currentModelApiInfo', this.currentModelApiInfo);
         ElMessage.success('模型加载成功!');
       } catch (error) {
         ElMessage.error(`模型加载失败: ${error.message}`);
+      } finally {
+        this.isModelApiLoading = false;
       }
     },
 
@@ -470,6 +478,7 @@ export default {
         ElMessage.warning('请输入API端点');
         return;
       }
+      this.isModelApiLoading = true;
       try {
         const response = await axios.post(`${API_BASE_URL}/chat/load_model`, {
           model_type: 'api',
@@ -477,17 +486,17 @@ export default {
           model_path: '',
           api: this.apiEndpoint
         });
-
         const { success, message } = response.data;
         if (!success) {
           throw new Error(message || 'API加载失败');
         }
-
         this.currentModelApiInfo = `API: ${this.apiEndpoint} (已加载)`;
         localStorage.setItem('currentModelApiInfo', this.currentModelApiInfo);
         ElMessage.success('API加载成功!');
       } catch (error) {
         ElMessage.error(`API加载失败: ${error.message}`);
+      } finally {
+        this.isModelApiLoading = false;
       }
     },
 
@@ -522,6 +531,7 @@ export default {
           document.body.removeChild(input);
 
           // 选择后自动加载模型
+          this.isModelApiLoading = true;
           try {
             const response = await axios.post(`${API_BASE_URL}/chat/load_model`, {
               model_type: 'safetensors',
@@ -538,6 +548,8 @@ export default {
             ElMessage.success('本地模型加载成功!');
           } catch (error) {
             ElMessage.error(`本地模型加载失败: ${error.message}`);
+          } finally {
+            this.isModelApiLoading = false;
           }
         };
       } catch (error) {
@@ -605,11 +617,9 @@ export default {
     goHome() { this.$router.push('/'); }
   },
   mounted() {
-    // 优先从 localStorage 恢复 currentModelApiInfo
-    const savedModelApiInfo = localStorage.getItem('currentModelApiInfo');
-    if (savedModelApiInfo) {
-      this.currentModelApiInfo = savedModelApiInfo;
-    }
+    // 页面首次打开时不自动恢复历史模型/api，默认未加载
+    this.currentModelApiInfo = '';
+    this.isModelApiLoading = false;
     this.fetchConversations();
     this.timerInterval = setInterval(() => {
       this.currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -869,6 +879,21 @@ export default {
   margin-bottom: 2px;
   text-align: center;
   display: inline-block;
+}
+
+.model-api-loading-spinner {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border: 3px solid #90caf9;
+  border-top: 3px solid #1976d2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 2px;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Floating particles and rainbow stripes (same as before, ensure z-index is low) */
