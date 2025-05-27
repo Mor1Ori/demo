@@ -28,6 +28,7 @@
           </div>
           <el-upload
             class="json-upload-area"
+            ref="jsonUpload"
             drag
             action=""
             :auto-upload="false"
@@ -39,15 +40,15 @@
             <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
             <div class="el-upload__text">将文件拖拽至此或点击上传</div>
           </el-upload>
-          <el-button
+          <!-- <el-button
             type="primary"
             plain
-            @click="viewFileDetails"
+            @click="handleJsonFileRemove"
             :disabled="!uploadedFile"
             style="margin-top: 15px; width: 100%;"
           >
             查看文件详情
-          </el-button>
+          </el-button> -->
         </div>
 
         <!-- Middle: 配置和文件信息展示 -->
@@ -56,8 +57,7 @@
             <div class="config-item">
               <label>选择要生成的字段</label>
               <el-select v-model="selectedField" placeholder="下拉选择框">
-                <el-option label="Instruction" value="instruction"></el-option>
-                <el-option label="Input" value="input"></el-option>
+                <el-option label="Context" value="context"></el-option>
                 <el-option label="Output" value="output"></el-option>
                 <el-option label="History" value="history"></el-option>
               </el-select>
@@ -70,7 +70,10 @@
             <p>已包含字段: {{ fileDetails.fields }}</p>
             <p>最长字段长度: {{ fileDetails.maxLength }}</p>
             <p>文件大小: {{ fileDetails.size }}</p>
-            <p>......</p>
+            <div v-if="fileDetails.maxFieldLengths && Object.keys(fileDetails.maxFieldLengths).length" style="margin-top:8px;">
+              <span style="font-weight:500;">各字段最大长度：</span>
+              <span v-for="(len, key) in fileDetails.maxFieldLengths" :key="key" style="margin-right:12px;">{{ key }}: {{ len }}</span>
+            </div>
           </div>
           <div v-else class="file-details-preview file-details-bordered" style="color:#888; font-size:15px;">请先上传json文件，上传后将展示详细信息</div>
         </div>
@@ -90,8 +93,9 @@
         <h2>已处理的json文件</h2>
         <el-table :data="processedFiles" stripe border style="width: 100%;">
           <el-table-column prop="name" label="文件名" sortable />
-          <el-table-column prop="scene" label="适用场景" sortable />
+          <el-table-column prop="path" label="文件路径" sortable />
           <el-table-column prop="time" label="转化时间" sortable />
+          <el-table-column prop="size" label="文件大小" sortable />
           <el-table-column label="操作" width="200">
             <template #default="scope">
               <el-button size="small" @click="viewProcessedFile(scope.row)">查看文件</el-button>
@@ -111,6 +115,8 @@
 
 <script>
 import { UploadFilled, Refresh, HomeFilled, FolderOpened, Loading } from '@element-plus/icons-vue';
+import axios from 'axios';
+const API_BASE_URL = 'http://localhost:5000';
 
 export default {
   name: 'JsonGenerationPage',
@@ -131,9 +137,7 @@ export default {
       selectedApi: '',
       localModelPath: '', // 新增本地模型路径
       processedFiles: [
-        { id: 1, name: '已转化文件1.json', scene: '情感分类', time: '2025-03-19 10:30:45' },
-        { id: 2, name: '已转化文件2.txt', scene: '工单预测', time: '2025-03-19 10:30:45' },
-        { id: 3, name: '已转化文件3.pdf', scene: '合规检测', time: '2025-03-19 10:30:45' },
+
       ]
     };
   },
@@ -144,18 +148,35 @@ export default {
     goHome() {
       this.$router.push('/'); // Adjust
     },
-    handleJsonFileUpload(file, fileList) {
-      if (fileList.length > 0) {
-        this.uploadedFile = fileList[0]; // Assuming limit is 1
-        // Simulate fetching file details
-        this.fileDetails = {
-          entries: 143,
-          fields: 'instruction, input, history...',
-          maxLength: 280,
-          size: '24KB'
-        };
-      } else {
-        this.uploadedFile = null;
+    async handleJsonFileUpload(file) {
+      // 拖拽上传文件时的回调，file为el-upload的文件对象
+      if (!file) return;
+      this.uploadedFile = file.raw || file; // el-upload 组件传递的file对象
+      try {
+        // 只传文件名+后缀，POST JSON
+        const payload = { file_path: file.name };
+        const res = await axios.post(
+          `${API_BASE_URL}/convert/upload`,
+          payload,
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+        const backendData = res.data;
+        if (backendData.success) {
+          this.fileDetails = {
+            entries: backendData.total_entries,
+            fields: Array.isArray(backendData.fields) ? backendData.fields.join(', ') : '',
+            maxLength: backendData.max_field_lengths ? Math.max(...Object.values(backendData.max_field_lengths)) : 0,
+            size: backendData.file_size_kb ? backendData.file_size_kb + 'B' : '',
+            maxFieldLengths: backendData.max_field_lengths || {}
+          };
+          this.$message.success('文件信息获取成功');
+        } else {
+          this.$message.error('后端返回失败: ' + (backendData.message || '未知错误'));
+          this.fileDetails = { entries: 0, fields: 'N/A', maxLength: 0, size: '0KB', maxFieldLengths: {} };
+        }
+      } catch (e) {
+        this.$message.error('文件解析失败或后端接口异常');
+        this.fileDetails = { entries: 0, fields: 'N/A', maxLength: 0, size: '0KB', maxFieldLengths: {} };
       }
     },
     handleJsonFileRemove() {
@@ -168,7 +189,41 @@ export default {
       }
     },
     directUpload() {
-      alert('直接上传功能触发');
+      // 创建文件选择输入框
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // 构建请求参数
+        const payload = { file_path: file.name };
+        
+        try {
+          const res = await axios.post(
+            `${API_BASE_URL}/convert/upload-direct`,
+            payload,
+            { headers: { 'Content-Type': 'application/json' } }
+          );
+          
+          const data = res.data;
+          if (data.success) {
+            this.$message.success(data.message || '文件上传成功');
+            // 上传成功后刷新文件列表
+            this.fetchProcessedFiles();
+          } else {
+            this.$message.error(data.message || '文件上传失败');
+          }
+        } catch (error) {
+          console.error('直接上传出错:', error);
+          this.$message.error('文件上传失败，请检查网络连接或服务器状态');
+        }
+      };
+      
+      // 触发文件选择
+      input.click();
     },
     viewProcessedFile(row) {
       alert(`查看已处理文件: ${row.name}`);
@@ -199,7 +254,61 @@ export default {
         this.$message.warning('请选择本地safetensors模型路径');
         return;
       }
-      this.$message.success('开始生成！（此处可补充实际生成逻辑）');
+      // 重新触发el-upload的清空，允许多次上传同名文件
+      this.$refs.jsonUpload && this.$refs.jsonUpload.clearFiles && this.$refs.jsonUpload.clearFiles();
+      // 重新上传逻辑（只传文件名+后缀）
+      const payload = { file_path: this.uploadedFile.name };
+      axios.post(
+        `${API_BASE_URL}/convert/upload`,
+        payload,
+        { headers: { 'Content-Type': 'application/json' } }
+      ).then(res => {
+        const backendData = res.data;
+        if (backendData.success) {
+          this.fileDetails = {
+            entries: backendData.total_entries,
+            fields: Array.isArray(backendData.fields) ? backendData.fields.join(', ') : '',
+            maxLength: backendData.max_field_lengths ? Math.max(...Object.values(backendData.max_field_lengths)) : 0,
+            size: backendData.file_size_kb ? backendData.file_size_kb + 'B' : '',
+            maxFieldLengths: backendData.max_field_lengths || {}
+          };
+          this.$message.success('文件信息获取成功');
+        } else {
+          this.$message.error('后端返回失败: ' + (backendData.message || '未知错误'));
+          this.fileDetails = { entries: 0, fields: 'N/A', maxLength: 0, size: '0KB', maxFieldLengths: {} };
+        }
+      }).catch(() => {
+        this.$message.error('文件解析失败或后端接口异常');
+        this.fileDetails = { entries: 0, fields: 'N/A', maxLength: 0, size: '0KB', maxFieldLengths: {} };
+      });
+    },
+    async fetchProcessedFiles() {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/convert`);
+        const data = res.data;
+        const files = data.files || [];
+        if (data.success && Array.isArray(data.files)) {
+          this.processedFiles = data.files.map(f => ({
+            name: f.file_name,
+            path: f.absolute_path,
+            size: this.formatFileSize(f.size_bytes),
+            time: f.converted_time
+          }));
+        } else {
+          this.processedFiles = [];
+        }
+      } catch (e) {
+        this.$message.error('获取已处理文件列表失败');
+        this.processedFiles = [];
+      }
+    },
+        // 新增：格式化文件大小
+    formatFileSize(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     },
   },
   mounted() {
@@ -211,6 +320,8 @@ export default {
     if (savedModelApiInfo) {
       this.currentModelApiInfo = savedModelApiInfo;
     }
+    // 新增：加载已处理的json文件列表
+    this.fetchProcessedFiles();
   },
   beforeUnmount() {
     clearInterval(this.timer);
