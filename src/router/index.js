@@ -11,6 +11,7 @@ const routes = [
     path: '/',
     redirect: '/chat'
   },
+  //todo:接口需要调整，在"/"基础上加个home
   {
     path: '/home',
     name: 'home',

@@ -3,17 +3,24 @@
     <div class="floating-particles"></div>
     <div class="rainbow-stripes"></div>
 
-    <div class="top-right-icons-container">
-      <el-button @click="refreshPage" type="text" class="icon-button"><el-icon><Refresh /></el-icon></el-button>
-      <el-button @click="goHome" type="text" class="icon-button"><el-icon><HomeFilled /></el-icon></el-button>
-      <span class="current-time">{{ currentTime }}</span>
+    <!-- 顶部栏：标题、模型/api、图标、时间 -->
+    <div class="top-bar" style="display: flex; align-items: center; justify-content: space-between; padding: 0 10px 10px 10px; border-bottom: 1px solid #e0e0e0; background-color: rgba(245,245,245,0.8); margin-bottom: 18px;">
+      <div style="font-size: 22px; color: #333; font-weight: bold;">📄 json数据条目生成</div>
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+        <div class="model-api-info model-api-info-blue">
+          当前已加载的模型/api: {{ currentModelApiInfo || '未加载' }}
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <el-button @click="refreshPage" type="text" class="icon-button"><el-icon><Refresh /></el-icon></el-button>
+        <el-button @click="goHome" type="text" class="icon-button"><el-icon><HomeFilled /></el-icon></el-button>
+        <span class="current-time" style="font-size: 22px; color: purple; font-weight: bold; margin-left: 10px;">{{ currentTime }}</span>
+      </div>
     </div>
-
-    <h1 class="page-title">📄 json数据条目生成</h1>
 
     <el-card class="main-content-card">
       <div class="top-section">
-        <!-- Left: Upload and File Info -->
+        <!-- Left: Upload -->
         <div class="upload-info-section">
           <div class="upload-header">
             <el-icon><FolderOpened /></el-icon>
@@ -41,7 +48,23 @@
           >
             查看文件详情
           </el-button>
-          <div v-if="uploadedFile" class="file-details-preview">
+        </div>
+
+        <!-- Middle: 配置和文件信息展示 -->
+        <div class="file-info-section">
+          <div class="config-section" style="margin-bottom: 18px;">
+            <div class="config-item">
+              <label>选择要生成的字段</label>
+              <el-select v-model="selectedField" placeholder="下拉选择框">
+                <el-option label="Instruction" value="instruction"></el-option>
+                <el-option label="Input" value="input"></el-option>
+                <el-option label="Output" value="output"></el-option>
+                <el-option label="History" value="history"></el-option>
+              </el-select>
+            </div>
+          </div>
+          <!-- 文件信息展示区域 -->
+          <div v-if="uploadedFile" class="file-details-preview file-details-bordered">
             <h4>文件信息:</h4>
             <p>数据条目: {{ fileDetails.entries }}</p>
             <p>已包含字段: {{ fileDetails.fields }}</p>
@@ -49,40 +72,7 @@
             <p>文件大小: {{ fileDetails.size }}</p>
             <p>......</p>
           </div>
-        </div>
-
-        <!-- Middle: Configuration -->
-        <div class="config-section">
-          <div class="config-item">
-            <label>选择要生成的字段</label>
-            <el-select v-model="selectedField" placeholder="下拉选择框">
-              <el-option label="Instruction" value="instruction"></el-option>
-              <el-option label="Input" value="input"></el-option>
-              <el-option label="Output" value="output"></el-option>
-              <el-option label="History" value="history"></el-option>
-            </el-select>
-          </div>
-          <div class="config-item">
-            <label>选择模型</label>
-            <el-select v-model="selectedModel" placeholder="下拉选择框">
-              <el-option label="模型 A (GPT-3.5)" value="model_a"></el-option>
-              <el-option label="模型 B (LLaMA)" value="model_b"></el-option>
-              <el-option label="模型 C (PaLM)" value="model_c"></el-option>
-            </el-select>
-          </div>
-          <div class="config-item">
-            <label>选择API</label>
-            <el-select v-model="selectedApi" placeholder="下拉选择框">
-              <el-option label="API Endpoint 1" value="api_1"></el-option>
-              <el-option label="API Endpoint 2" value="api_2"></el-option>
-            </el-select>
-          </div>
-          <!-- 新增：选择本地safetensors格式模型 -->
-          <div class="config-item">
-            <label>选择本地safetensors格式模型</label>
-            <el-button type="primary" @click="selectLocalModelPath" style="width:100%;">选择模型文件夹路径</el-button>
-            <div v-if="localModelPath" class="path-display">路径: {{ localModelPath }}</div>
-          </div>
+          <div v-else class="file-details-preview file-details-bordered" style="color:#888; font-size:15px;">请先上传json文件，上传后将展示详细信息</div>
         </div>
 
         <!-- Right: Actions -->
@@ -92,9 +82,6 @@
             <div>需要添加的加载动画...</div>
             <div>需要添加的加载进度...</div>
           </el-card>
-          <el-button type="warning" @click="directUpload" class="direct-upload-btn">
-            直接上传
-          </el-button>
         </div>
       </div>
 
@@ -112,9 +99,10 @@
             </template>
           </el-table-column>
         </el-table>
-        <!-- 居中显示开始生成按钮 -->
-        <div style="width:100%;display:flex;justify-content:center;margin-top:24px;">
+        <!-- 并排居中显示开始生成和直接上传按钮 -->
+        <div style="width:100%;display:flex;justify-content:center;gap:24px;margin-top:24px;">
           <el-button type="success" class="start-generation-btn" @click="handleStartGeneration" style="width: 180px; font-size: 15px;">开始生成</el-button>
+          <el-button type="warning" @click="directUpload" class="direct-upload-btn" style="width: 180px; font-size: 15px;">直接上传</el-button>
         </div>
       </div>
     </el-card>
@@ -130,6 +118,7 @@ export default {
   data() {
     return {
       currentTime: new Date().toLocaleTimeString(),
+      currentModelApiInfo: '', // 新增
       uploadedFile: null,
       fileDetails: {
         entries: 0,
@@ -217,6 +206,11 @@ export default {
     this.timer = setInterval(() => {
       this.currentTime = new Date().toLocaleTimeString();
     }, 1000);
+    // 新增：加载模型/api信息
+    const savedModelApiInfo = localStorage.getItem('currentModelApiInfo');
+    if (savedModelApiInfo) {
+      this.currentModelApiInfo = savedModelApiInfo;
+    }
   },
   beforeUnmount() {
     clearInterval(this.timer);
@@ -231,13 +225,14 @@ export default {
   min-height: calc(100vh - 40px);
 }
 
-.top-right-icons-container {
-  position: absolute;
-  top: 20px;
-  right: 20px;
+.top-bar {
   display: flex;
   align-items: center;
-  z-index: 10;
+  justify-content: space-between;
+  padding: 0 10px 10px 10px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: rgba(245, 245, 245, 0.8);
+  margin-bottom: 18px;
 }
 
 .icon-button {
@@ -303,21 +298,39 @@ export default {
   padding: 20px; /* Smaller padding */
 }
 
+.file-info-section {
+  flex-basis: 40%;
+  min-width: 400px;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+}
 .file-details-preview {
   margin-top: 15px;
-  background-color: #f8f9fa;
-  padding: 10px;
-  border-radius: 6px;
-  font-size: 13px;
+  background-color: #fdfdff; /* 与上传区域统一 */
+  padding: 22px 24px;
+  border-radius: 8px;
+  font-size: 16px;
   color: #495057;
+  min-height: 180px;
 }
 .file-details-preview h4 {
   margin-top: 0;
-  margin-bottom: 8px;
-  font-size: 14px;
+  margin-bottom: 12px;
+  font-size: 17px;
 }
 .file-details-preview p {
-  margin: 4px 0;
+  margin: 7px 0;
+  font-size: 15px;
+}
+.file-details-bordered {
+  border: 2px solid #e0e0e0; /* 与上传区域统一 */
+  border-radius: 8px;
+  padding: 18px 20px;
+  background-color: #fdfdff; /* 与上传区域统一 */
+  color: #0056b3;
 }
 
 
@@ -424,5 +437,19 @@ export default {
 @keyframes rainbowMove {
   0% { background-position: 0% 0%; }
   100% { background-position: 100% 100%; }
+}
+
+.model-api-info-blue {
+  background-color: #e9f5ff;
+  color: #2563eb;
+  font-size: 15px;
+  font-weight: 500;
+  padding: 5px 18px;
+  border-radius: 15px;
+  border: 1px solid #cce7ff;
+  margin-top: 2px;
+  margin-bottom: 2px;
+  text-align: center;
+  display: inline-block;
 }
 </style>

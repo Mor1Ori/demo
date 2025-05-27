@@ -12,7 +12,7 @@
     -->
       <el-menu :default-active="activeMenu" router @select="handleMenuSelect">
        
- <el-menu-item index="/chat" class="menu-item">
+        <el-menu-item index="/chat" class="menu-item">
           <!-- 使用 el-icon 组件来包裹图标，确保一致性 -->
           <el-icon><ChatDotRound /></el-icon>
           <span>智能聊天</span>
@@ -25,9 +25,15 @@
 
        
 
- <el-menu-item index="/" class="menu-item">
+        <!-- <el-menu-item index="/home" class="menu-item">
           <el-icon><UploadFilled /></el-icon>
           <span>数据转化</span>
+        </el-menu-item> -->
+
+        <!-- 新增：JSON数据条目生成 入口 -->
+        <el-menu-item index="/json-generation" class="menu-item">
+          <el-icon><Tickets /></el-icon> <!-- 使用一个合适的图标 -->
+          <span>JSON条目生成</span>
         </el-menu-item>
 
         <!-- 新增：数据预集成与操作 入口 -->
@@ -35,12 +41,7 @@
           <el-icon><Operation /></el-icon> <!-- 使用一个合适的图标 -->
           <span>数据集预览与操作</span>
         </el-menu-item>
-
-        <!-- 新增：JSON数据条目生成 入口 -->
-        <el-menu-item index="/json-generation" class="menu-item">
-          <el-icon><Tickets /></el-icon> <!-- 使用一个合适的图标 -->
-          <span>JSON条目生成</span>
-        </el-menu-item>
+      
 
       </el-menu>
 
