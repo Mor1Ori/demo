@@ -241,46 +241,83 @@ export default {
       }
     },
     // 新增：开始生成按钮逻辑
-    handleStartGeneration() {
+    async handleStartGeneration() {
       if (!this.uploadedFile) {
         this.$message.warning('请先上传json文件');
         return;
       }
-      if (!this.selectedField || !this.selectedModel || !this.selectedApi) {
-        this.$message.warning('请先选择字段、模型和API');
+      if (!this.selectedField) {
+        this.$message.warning('请选择要生成的字段');
         return;
       }
-      if (!this.localModelPath) {
-        this.$message.warning('请选择本地safetensors模型路径');
-        return;
-      }
-      // 重新触发el-upload的清空，允许多次上传同名文件
-      this.$refs.jsonUpload && this.$refs.jsonUpload.clearFiles && this.$refs.jsonUpload.clearFiles();
-      // 重新上传逻辑（只传文件名+后缀）
-      const payload = { file_path: this.uploadedFile.name };
-      axios.post(
-        `${API_BASE_URL}/convert/upload`,
-        payload,
-        { headers: { 'Content-Type': 'application/json' } }
-      ).then(res => {
-        const backendData = res.data;
-        if (backendData.success) {
-          this.fileDetails = {
-            entries: backendData.total_entries,
-            fields: Array.isArray(backendData.fields) ? backendData.fields.join(', ') : '',
-            maxLength: backendData.max_field_lengths ? Math.max(...Object.values(backendData.max_field_lengths)) : 0,
-            size: backendData.file_size_kb ? backendData.file_size_kb + 'B' : '',
-            maxFieldLengths: backendData.max_field_lengths || {}
-          };
-          this.$message.success('文件信息获取成功');
+
+      // 弹出提示框让用户选择并行线程数
+      const maxWorkers = await this.$prompt('请输入并行线程数（1-8）', '参数设置', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputPattern: /^[1-8]$/,
+        inputErrorMessage: '请输入1-8之间的数字'
+      }).then(({ value }) => parseInt(value))
+        .catch(() => null);
+
+      if (maxWorkers === null) return;
+
+      // 弹出提示框让用户选择批次大小
+      const batchSize = await this.$prompt('请输入每批次处理的数据量（1-50）', '参数设置', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputPattern: /^[1-9]|[1-4][0-9]|50$/,
+        inputErrorMessage: '请输入1-50之间的数字'
+      }).then(({ value }) => parseInt(value))
+        .catch(() => null);
+
+      if (batchSize === null) return;
+
+      try {
+        // 构建请求参数
+        const payload = {
+          file_path: this.uploadedFile.name,
+          target_field: this.selectedField,
+          max_workers: maxWorkers,
+          batch_size: batchSize
+        };
+
+        // 发送生成请求
+        const res = await axios.post(
+          `${API_BASE_URL}/convert/generate`,
+          payload,
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+
+        const data = res.data;
+        if (data.success) {
+          // 显示成功消息和统计信息
+          this.$message.success(data.message || '生成成功');
+          
+          // 显示统计信息
+          const stats = data.stats;
+          this.$alert(
+            `处理完成！\n\n` +
+            `总数据条数：${stats['总数据条数']}\n` +
+            `处理数据量：${stats['处理数据量']}\n` +
+            `处理时间：${stats['处理时间']}\n` +
+            `处理速度：${stats['处理速度']}`,
+            '处理统计',
+            {
+              confirmButtonText: '确定',
+              callback: () => {
+                // 刷新文件列表
+                this.fetchProcessedFiles();
+              }
+            }
+          );
         } else {
-          this.$message.error('后端返回失败: ' + (backendData.message || '未知错误'));
-          this.fileDetails = { entries: 0, fields: 'N/A', maxLength: 0, size: '0KB', maxFieldLengths: {} };
+          this.$message.error(data.message || '生成失败');
         }
-      }).catch(() => {
-        this.$message.error('文件解析失败或后端接口异常');
-        this.fileDetails = { entries: 0, fields: 'N/A', maxLength: 0, size: '0KB', maxFieldLengths: {} };
-      });
+      } catch (error) {
+        console.error('生成过程出错:', error);
+        this.$message.error('生成失败，请检查网络连接或服务器状态');
+      }
     },
     async fetchProcessedFiles() {
       try {
