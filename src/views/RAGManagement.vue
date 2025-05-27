@@ -693,7 +693,11 @@ export default {
           const response = await axios.delete(`${API_BASE_URL}/rag-management/delete-all-file`);
           const data = response.data;
           if (data.success) {
-            ElMessage.success(data.message || '所有向量文件已清空');
+            // 按接口文档展示详细信息
+            let msg = `${data.message || '所有向量文件已清空'}<br>`;
+            msg += `清除的文档块总数: <b>${data.document_count ?? '-'}</b><br>`;
+            msg += `清除的已处理文件总数: <b>${data.file_count ?? '-'}</b>`;
+            ElMessageBox.alert(msg, '清空结果', { dangerouslyUseHTMLString: true });
             await this.fetchRagManagementData && this.fetchRagManagementData();
           } else {
             ElMessage.error(data.message || '清空向量文件失败');

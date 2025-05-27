@@ -6,8 +6,10 @@
     <!-- Top Bar: Title, Model Info, Icons -->
     <div class="top-bar">
       <h1 class="page-title">🤖 智能问答</h1>
-      <div class="model-api-info">
-        当前已加载的模型/api: {{ currentModelApiInfo || '未加载' }}
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+        <div class="model-api-info model-api-info-blue">
+          当前已加载的模型/api: {{ currentModelApiInfo || '未加载' }}
+        </div>
       </div>
       <div class="top-right-actions">
         <el-button @click="refreshPage" type="text" class="icon-action-button">
@@ -455,6 +457,7 @@ export default {
         }
 
         this.currentModelApiInfo = `模型: ${this.selectedRemoteModel} (已加载)`;
+        localStorage.setItem('currentModelApiInfo', this.currentModelApiInfo);
         ElMessage.success('模型加载成功!');
       } catch (error) {
         ElMessage.error(`模型加载失败: ${error.message}`);
@@ -481,6 +484,7 @@ export default {
         }
 
         this.currentModelApiInfo = `API: ${this.apiEndpoint} (已加载)`;
+        localStorage.setItem('currentModelApiInfo', this.currentModelApiInfo);
         ElMessage.success('API加载成功!');
       } catch (error) {
         ElMessage.error(`API加载失败: ${error.message}`);
@@ -530,6 +534,7 @@ export default {
               throw new Error(message || '本地模型加载失败');
             }
             this.currentModelApiInfo = `本地模型: ${this.localModelPath} (已加载)`;
+            localStorage.setItem('currentModelApiInfo', this.currentModelApiInfo);
             ElMessage.success('本地模型加载成功!');
           } catch (error) {
             ElMessage.error(`本地模型加载失败: ${error.message}`);
@@ -600,6 +605,11 @@ export default {
     goHome() { this.$router.push('/'); }
   },
   mounted() {
+    // 优先从 localStorage 恢复 currentModelApiInfo
+    const savedModelApiInfo = localStorage.getItem('currentModelApiInfo');
+    if (savedModelApiInfo) {
+      this.currentModelApiInfo = savedModelApiInfo;
+    }
     this.fetchConversations();
     this.timerInterval = setInterval(() => {
       this.currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -847,6 +857,19 @@ export default {
   word-break: break-all; background-color: #f0f2f5; padding: 5px; border-radius: 4px;
 }
 
+.model-api-info-blue {
+  background-color: #e9f5ff;
+  color: #2563eb;
+  font-size: 15px;
+  font-weight: 500;
+  padding: 5px 18px;
+  border-radius: 15px;
+  border: 1px solid #cce7ff;
+  margin-top: 2px;
+  margin-bottom: 2px;
+  text-align: center;
+  display: inline-block;
+}
 
 /* Floating particles and rainbow stripes (same as before, ensure z-index is low) */
 .floating-particles { z-index: -2; /* ... */ }
