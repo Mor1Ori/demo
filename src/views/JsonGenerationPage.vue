@@ -99,7 +99,6 @@
           <el-table-column label="操作" width="200">
             <template #default="scope">
               <el-button size="small" @click="viewProcessedFile(scope.row)">查看文件</el-button>
-              <el-button type="primary" size="small" @click="downloadFile(scope.row)">下载</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -191,8 +190,23 @@ export default {
     directUpload() {
       alert('直接上传功能触发');
     },
-    viewProcessedFile(row) {
-      alert(`查看已处理文件: ${row.name}`);
+    async viewProcessedFile(row) {
+      // 1. 发送文件名给后端，获取标准结构json
+      try {
+        const res = await axios.post(`${API_BASE_URL}/convert/get-integrated-json`, { file_name: row.name });
+        if (res.data && res.data.success && Array.isArray(res.data.data)) {
+          // 2. 跳转到DataIntegrationPage，携带数据
+          this.$router.push({
+            path: '/data-integration',
+            query: { fromJson: '1' },
+            state: { integratedData: res.data.data, fileStats: { entries: res.data.data.length, size: row.size } }
+          });
+        } else {
+          this.$message.error(res.data.message || '后端未返回有效数据');
+        }
+      } catch (e) {
+        this.$message.error('获取集成数据失败: ' + (e.message || '未知错误'));
+      }
     },
     downloadFile(row) {
       alert(`下载文件: ${row.name}`);

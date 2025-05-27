@@ -129,11 +129,10 @@ export default {
       isEditing: false,
       hasChanges: false,
       tableColumns: [ // 定义表格列，方便动态渲染和编辑控制
-        { prop: 'input', label: 'Input (list - Lengths)', minWidth: '280', editable: true },
-        { prop: 'output', label: 'Output (string - Lengths)', minWidth: '280', editable: true },
-        { prop: 'category', label: 'Category (string - classes)', width: '150', editable: true },
-        { prop: 'license', label: 'License (string - classes)', width: '150', editable: true },
-        { prop: 'reasoning', label: 'Reasoning (string - ...)', width: '150', editable: true },
+        { prop: 'instruction', label: 'Instruction', minWidth: '220', editable: true },
+        { prop: 'input', label: 'Input', minWidth: '220', editable: true },
+        { prop: 'context', label: 'Context', minWidth: '220', editable: true },
+        { prop: 'output', label: 'Output', minWidth: '220', editable: true },
       ],
       selectedColumnForProcessing: 'output', // 默认处理 output 列
 
