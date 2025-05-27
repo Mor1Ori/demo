@@ -57,7 +57,7 @@
             <div class="config-item">
               <label>选择要生成的字段</label>
               <el-select v-model="selectedField" placeholder="下拉选择框">
-                <el-option label="Context" value="Context"></el-option>
+                <el-option label="Context" value="context"></el-option>
                 <el-option label="Output" value="output"></el-option>
                 <el-option label="History" value="history"></el-option>
               </el-select>
@@ -189,7 +189,41 @@ export default {
       }
     },
     directUpload() {
-      alert('直接上传功能触发');
+      // 创建文件选择输入框
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // 构建请求参数
+        const payload = { file_path: file.name };
+        
+        try {
+          const res = await axios.post(
+            `${API_BASE_URL}/convert/upload-direct`,
+            payload,
+            { headers: { 'Content-Type': 'application/json' } }
+          );
+          
+          const data = res.data;
+          if (data.success) {
+            this.$message.success(data.message || '文件上传成功');
+            // 上传成功后刷新文件列表
+            this.fetchProcessedFiles();
+          } else {
+            this.$message.error(data.message || '文件上传失败');
+          }
+        } catch (error) {
+          console.error('直接上传出错:', error);
+          this.$message.error('文件上传失败，请检查网络连接或服务器状态');
+        }
+      };
+      
+      // 触发文件选择
+      input.click();
     },
     viewProcessedFile(row) {
       alert(`查看已处理文件: ${row.name}`);
