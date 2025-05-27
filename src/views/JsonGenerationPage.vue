@@ -70,7 +70,7 @@
             <p>已包含字段: {{ fileDetails.fields }}</p>
             <p>最长字段长度: {{ fileDetails.maxLength }}</p>
             <p>文件大小: {{ fileDetails.size }}</p>
-            <div style="margin-top:8px;">
+            <div v-if="fileDetails.maxFieldLengths && Object.keys(fileDetails.maxFieldLengths).length" style="margin-top:8px;">
               <span style="font-weight:500;">各字段最大长度：</span>
               <span v-for="(len, key) in fileDetails.maxFieldLengths" :key="key" style="margin-right:12px;">{{ key }}: {{ len }}</span>
             </div>
@@ -147,10 +147,15 @@ export default {
     goHome() {
       this.$router.push('/'); // Adjust
     },
-    handleJsonFileUpload(file, fileList) {
+    async handleJsonFileUpload(file, fileList) {
       if (fileList.length > 0) {
-        this.uploadedFile = fileList[0]; // Assuming limit is 1
-        // 假设后端返回的json数据如下（实际应为接口返回）
+        this.uploadedFile = fileList[0];
+        // 实际开发中应通过接口获取数据，这里用模拟异步请求
+        // const formData = new FormData();
+        // formData.append('file', fileList[0].raw || fileList[0]);
+        // const res = await axios.post('/convert/upload', formData)
+        // const backendData = res.data;
+        // 这里用示例数据模拟
         const backendData = {
           success: true,
           total_entries: 4,
@@ -168,7 +173,7 @@ export default {
           fields: backendData.fields.join(', '),
           maxLength: Math.max(...Object.values(backendData.max_field_lengths)),
           size: backendData.file_size_kb + 'KB',
-          maxFieldLengths: backendData.max_field_lengths // 便于后续扩展
+          maxFieldLengths: backendData.max_field_lengths
         };
       } else {
         this.uploadedFile = null;
