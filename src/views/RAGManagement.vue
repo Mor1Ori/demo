@@ -608,22 +608,17 @@ export default {
       input.accept = '.xls,.xlsx,.csv';
       input.onchange = async (event) => {
         const file = event.target.files[0];
+        const forceReprocess = false; // 默认不强制重新处理
         if (!file) return;
-        // 获取文件夹名（单文件时取webkitRelativePath的第一个目录，否则为空）
-        let folderName = '';
-        if (file.webkitRelativePath) {
-          const parts = file.webkitRelativePath.split('/');
-          if (parts.length > 1) folderName = parts[0];
-        }
         this.isLoadingTable = true;
         const loadingInstance = this.$loading ? this.$loading({ text: '正在上传数据库文件...' }) : ElLoading.service({ text: '正在上传数据库文件...' });
         try {
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('relative_path', file.name);
-          if (folderName) formData.append('folder_name', folderName);
-          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-database`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
+          // 只传文件名+后缀
+          const payload = { excel_file_path: file.name ,
+            force_reprocess: forceReprocess
+          };
+          const response = await axios.post(`${API_BASE_URL}/rag-management/upload-database`, payload, {
+            headers: { 'Content-Type': 'application/json' }
           });
           const data = response.data;
           if (data.success) {

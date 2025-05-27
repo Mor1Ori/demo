@@ -186,6 +186,7 @@ export default {
 
     // Fetch conversation list (3.1: GET /chat)
     async fetchConversations() {
+      currentModelApiInfo="";
       try {
         const response = await axios.get(`${API_BASE_URL}/chat`);
         const { success, chats } = response.data;
@@ -617,8 +618,13 @@ export default {
     goHome() { this.$router.push('/'); }
   },
   mounted() {
-    // 页面首次打开时不自动恢复历史模型/api，默认未加载
-    this.currentModelApiInfo = '';
+    // 页面首次打开时，只有本地存储有currentModelApiInfo才恢复（且需非空），否则显示未加载
+    const savedModelApiInfo = localStorage.getItem('currentModelApiInfo');
+    if (savedModelApiInfo && savedModelApiInfo !== '未加载') {
+      this.currentModelApiInfo = savedModelApiInfo;
+    } else {
+      this.currentModelApiInfo = '';
+    }
     this.isModelApiLoading = false;
     this.fetchConversations();
     this.timerInterval = setInterval(() => {

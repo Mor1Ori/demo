@@ -130,6 +130,10 @@ export default {
   },
   mounted() {
     this.activeMenu = this.$route.path;
+    // 关闭浏览器窗口时清空localStorage所有数据
+    window.addEventListener('beforeunload', () => {
+      localStorage.clear();
+    });
   }
 };
 </script>
