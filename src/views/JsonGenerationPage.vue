@@ -78,14 +78,6 @@
           <div v-else class="file-details-preview file-details-bordered" style="color:#888; font-size:15px;">请先上传json文件，上传后将展示详细信息</div>
         </div>
 
-        <!-- Right: Actions -->
-        <div class="actions-section">
-          <el-card class="loading-placeholder-small">
-            <el-icon><Loading /></el-icon>
-            <div>需要添加的加载动画...</div>
-            <div>需要添加的加载进度...</div>
-          </el-card>
-        </div>
       </div>
 
       <!-- Bottom: Processed Files Table -->
@@ -225,21 +217,30 @@ export default {
       input.click();
     },
     async viewProcessedFile(row) {
-      // 1. 发送文件名给后端，获取标准结构json
       try {
-        const res = await axios.post(`${API_BASE_URL}/convert/get-integrated-json`, { file_name: row.name });
-        if (res.data && res.data.success && Array.isArray(res.data.data)) {
-          // 2. 跳转到DataIntegrationPage，携带数据
+        const res = await axios.post(`${API_BASE_URL}/convert/preview`, { 
+          file_path: row.name 
+        });
+        
+        if (res.data && res.data.success) {
+          // 跳转到DataIntegrationPage，携带数据
           this.$router.push({
             path: '/data-integration',
             query: { fromJson: '1' },
-            state: { integratedData: res.data.data, fileStats: { entries: res.data.data.length, size: row.size } }
+            state: { 
+              integratedData: res.data.content,
+              fileStats: {
+                entries: res.data.information.total_entries,
+                size: this.formatFileSize(res.data.information.file_size),
+                maxFieldLengths: res.data.information.max_field_lengths
+              }
+            }
           });
         } else {
-          this.$message.error(res.data.message || '后端未返回有效数据');
+          this.$message.error(res.data.message || '获取文件预览失败');
         }
       } catch (e) {
-        this.$message.error('获取集成数据失败: ' + (e.message || '未知错误'));
+        this.$message.error('获取文件预览失败: ' + (e.message || '未知错误'));
       }
     },
     downloadFile(row) {

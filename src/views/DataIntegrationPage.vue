@@ -89,11 +89,6 @@
       </div>
 
       <div class="right-sidebar">
-        <el-card class="loading-placeholder">
-          <el-icon><Loading /></el-icon>
-          <div>需要添加的加载动画...</div>
-          <div>需要添加的加载进度...</div>
-        </el-card>
         <el-card class="file-stats-card">
           <h3>文件统计:</h3>
           <p>数据条目: {{ fileStats.entries }}</p>

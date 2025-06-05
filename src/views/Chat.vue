@@ -422,13 +422,20 @@ export default {
           throw new Error('消息发送失败');
         }
 
+        // 处理换行，将\n或\r\n替换为<br>
+        function formatWithBr(str) {
+          if (!str) return '';
+          return String(str).replace(/\r?\n/g, '<br>');
+        }
+
         const aiMessage = {
           id: `msg_${Date.now()}_ai`,
           sender: 'ai',
+          // 用v-html渲染时，内容中换行转为<br>
           text:
-             (this.showModelThinking && think ? `【模型思考】${think}\n\r` : '') +
-              `【回答内容】${aiResponseText}` +
-              (this.showRagReference && sources ? `\n\r【RAG参考】${Array.isArray(sources) ? sources.join(', ') : sources}` : ''),
+            (this.showModelThinking && think ? `【模型思考】${formatWithBr(think)}<br>` : '') +
+            `【回答内容】${formatWithBr(aiResponseText)}` +
+            (this.showRagReference && sources ? `<br>【RAG参考】${formatWithBr(Array.isArray(sources) ? sources.join(', ') : sources)}` : ''),
           timestamp: new Date().toISOString(),
           think: this.showModelThinking ? think : null,
           sources: this.showRagReference ? sources : null
