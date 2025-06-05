@@ -186,7 +186,7 @@ export default {
 
     // Fetch conversation list (3.1: GET /chat)
     async fetchConversations() {
-      currentModelApiInfo="";
+      this.currentModelApiInfo="";
       try {
         const response = await axios.get(`${API_BASE_URL}/chat`);
         const { success, chats } = response.data;
