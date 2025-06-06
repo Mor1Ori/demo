@@ -3,7 +3,6 @@
     <div class="floating-particles"></div>
     <div class="rainbow-stripes"></div>
 
-    <!-- 顶部栏：标题、模型/api、图标、时间 -->
     <div class="top-bar" style="display: flex; align-items: center; justify-content: space-between; padding: 0 10px 10px 10px; border-bottom: 1px solid #e0e0e0; background-color: rgba(245,245,245,0.8); margin-bottom: 18px;">
       <div style="font-size: 22px; color: #333; font-weight: bold;">📄 json数据条目生成</div>
       <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
@@ -18,9 +17,15 @@
       </div>
     </div>
 
-    <el-card class="main-content-card">
+    <el-card
+      class="main-content-card"
+      v-loading="isLoading"
+      element-loading-text="正在生成内容，请稍候..."
+      :element-loading-spinner="Loading"
+      element-loading-svg-view-box="-10, -10, 50, 50"
+      element-loading-background="rgba(255, 255, 255, 0.8)"
+    >
       <div class="top-section">
-        <!-- Left: Upload -->
         <div class="upload-info-section">
           <div class="upload-header">
             <el-icon><FolderOpened /></el-icon>
@@ -40,30 +45,8 @@
             <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
             <div class="el-upload__text">将文件拖拽至此或点击上传</div>
           </el-upload>
-          <!-- <el-button
-            type="primary"
-            plain
-            @click="handleJsonFileRemove"
-            :disabled="!uploadedFile"
-            style="margin-top: 15px; width: 100%;"
-          >
-            查看文件详情
-          </el-button> -->
         </div>
-
-        <!-- Middle: 配置和文件信息展示 -->
-        <div class="file-info-section">
-          <div class="config-section" style="margin-bottom: 18px;">
-            <div class="config-item">
-              <label>选择要生成的字段</label>
-              <el-select v-model="selectedField" placeholder="下拉选择框">
-                <el-option label="Context" value="context"></el-option>
-                <el-option label="Output" value="output"></el-option>
-                <el-option label="History" value="history"></el-option>
-              </el-select>
-            </div>
-          </div>
-          <!-- 文件信息展示区域 -->
+        <div class="file-details-section">
           <div v-if="uploadedFile" class="file-details-preview file-details-bordered">
             <h4>文件信息:</h4>
             <p>数据条目: {{ fileDetails.entries }}</p>
@@ -77,10 +60,18 @@
           </div>
           <div v-else class="file-details-preview file-details-bordered" style="color:#888; font-size:15px;">请先上传json文件，上传后将展示详细信息</div>
         </div>
-
+        <div class="config-section config-section-vertical">
+          <div class="config-item">
+            <label>选择要生成的字段</label>
+            <el-select v-model="selectedField" placeholder="下拉选择框">
+              <el-option label="Context" value="context"></el-option>
+              <el-option label="Output" value="output"></el-option>
+              <el-option label="History" value="history"></el-option>
+            </el-select>
+          </div>
+        </div>
       </div>
 
-      <!-- Bottom: Processed Files Table -->
       <div class="processed-files-section">
         <h2>已处理的json文件</h2>
         <el-table :data="processedFiles" stripe border style="width: 100%;">
@@ -94,7 +85,6 @@
             </template>
           </el-table-column>
         </el-table>
-        <!-- 并排居中显示开始生成和直接上传按钮 -->
         <div style="width:100%;display:flex;justify-content:center;gap:24px;margin-top:24px;">
           <el-button type="success" class="start-generation-btn" @click="handleStartGeneration" style="width: 180px; font-size: 15px;">开始生成</el-button>
           <el-button type="warning" @click="directUpload" class="direct-upload-btn" style="width: 180px; font-size: 15px;">直接上传</el-button>
@@ -121,15 +111,16 @@ export default {
         entries: 0,
         fields: 'N/A',
         maxLength: 0,
-        size: '0KB'
+        size: '0KB',
+        maxFieldLengths: {} // 确保初始状态有这个属性
       },
       selectedField: '',
       selectedModel: '',
       selectedApi: '',
       localModelPath: '', // 新增本地模型路径
-      processedFiles: [
-
-      ]
+      processedFiles: [],
+      isLoading: false, // <--- 新增：控制加载状态
+      Loading, // <--- 新增：将导入的Loading组件暴露给template，用于v-loading的自定义spinner
     };
   },
   methods: {
@@ -140,11 +131,9 @@ export default {
       this.$router.push('/'); // Adjust
     },
     async handleJsonFileUpload(file) {
-      // 拖拽上传文件时的回调，file为el-upload的文件对象
       if (!file) return;
-      this.uploadedFile = file.raw || file; // el-upload 组件传递的file对象
+      this.uploadedFile = file.raw || file;
       try {
-        // 只传文件名+后缀，POST JSON
         const payload = { file_path: file.name };
         const res = await axios.post(
           `${API_BASE_URL}/convert/upload`,
@@ -157,7 +146,7 @@ export default {
             entries: backendData.total_entries,
             fields: Array.isArray(backendData.fields) ? backendData.fields.join(', ') : '',
             maxLength: backendData.max_field_lengths ? Math.max(...Object.values(backendData.max_field_lengths)) : 0,
-            size: backendData.file_size_kb ? backendData.file_size_kb + 'B' : '',
+            size: backendData.file_size_kb ? backendData.file_size_kb + 'B' : '', // 注意：如果后端file_size_kb是KB单位，这里应为 + 'KB'
             maxFieldLengths: backendData.max_field_lengths || {}
           };
           this.$message.success('文件信息获取成功');
@@ -172,7 +161,7 @@ export default {
     },
     handleJsonFileRemove() {
         this.uploadedFile = null;
-        this.fileDetails = { entries: 0, fields: 'N/A', maxLength: 0, size: '0KB' };
+        this.fileDetails = { entries: 0, fields: 'N/A', maxLength: 0, size: '0KB', maxFieldLengths: {} };
     },
     viewFileDetails() {
       if (this.uploadedFile) {
@@ -180,29 +169,26 @@ export default {
       }
     },
     directUpload() {
-      // 创建文件选择输入框
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.json';
-      
+
       input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        
-        // 构建请求参数
+
         const payload = { file_path: file.name };
-        
+
         try {
           const res = await axios.post(
             `${API_BASE_URL}/convert/upload-direct`,
             payload,
             { headers: { 'Content-Type': 'application/json' } }
           );
-          
+
           const data = res.data;
           if (data.success) {
             this.$message.success(data.message || '文件上传成功');
-            // 上传成功后刷新文件列表
             this.fetchProcessedFiles();
           } else {
             this.$message.error(data.message || '文件上传失败');
@@ -212,22 +198,19 @@ export default {
           this.$message.error('文件上传失败，请检查网络连接或服务器状态');
         }
       };
-      
-      // 触发文件选择
       input.click();
     },
     async viewProcessedFile(row) {
       try {
-        const res = await axios.post(`${API_BASE_URL}/convert/preview`, { 
-          file_path: row.name 
+        const res = await axios.post(`${API_BASE_URL}/convert/preview`, {
+          file_path: row.name
         });
-        
+
         if (res.data && res.data.success) {
-          // 跳转到DataIntegrationPage，携带数据
           this.$router.push({
             path: '/data-integration',
             query: { fromJson: '1' },
-            state: { 
+            state: {
               integratedData: res.data.content,
               fileStats: {
                 entries: res.data.information.total_entries,
@@ -246,16 +229,12 @@ export default {
     downloadFile(row) {
       alert(`下载文件: ${row.name}`);
     },
-    // 新增：选择本地模型路径
     async selectLocalModelPath() {
-      // 仅演示，实际可用 window.showDirectoryPicker 或 input[type=file] webkitdirectory
-      // 这里用 prompt 模拟
       const path = prompt('请输入本地safetensors模型文件夹路径:');
       if (path) {
         this.localModelPath = path;
       }
     },
-    // 新增：开始生成按钮逻辑
     async handleStartGeneration() {
       if (!this.uploadedFile) {
         this.$message.warning('请先上传json文件');
@@ -266,7 +245,6 @@ export default {
         return;
       }
 
-      // 弹出提示框让用户选择并行线程数
       const maxWorkers = await this.$prompt('请输入并行线程数（1-8）', '参数设置', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
@@ -277,7 +255,6 @@ export default {
 
       if (maxWorkers === null) return;
 
-      // 弹出提示框让用户选择批次大小
       const batchSize = await this.$prompt('请输入每批次处理的数据量（1-50）', '参数设置', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
@@ -288,8 +265,9 @@ export default {
 
       if (batchSize === null) return;
 
+      this.isLoading = true; // <--- 在请求开始前，设置isLoading为true
+
       try {
-        // 构建请求参数
         const payload = {
           file_path: this.uploadedFile.name,
           target_field: this.selectedField,
@@ -297,7 +275,6 @@ export default {
           batch_size: batchSize
         };
 
-        // 发送生成请求
         const res = await axios.post(
           `${API_BASE_URL}/convert/generate`,
           payload,
@@ -306,10 +283,8 @@ export default {
 
         const data = res.data;
         if (data.success) {
-          // 显示成功消息和统计信息
           this.$message.success(data.message || '生成成功');
-          
-          // 显示统计信息
+
           const stats = data.stats;
           this.$alert(
             `处理完成！\n\n` +
@@ -321,7 +296,6 @@ export default {
             {
               confirmButtonText: '确定',
               callback: () => {
-                // 刷新文件列表
                 this.fetchProcessedFiles();
               }
             }
@@ -332,6 +306,8 @@ export default {
       } catch (error) {
         console.error('生成过程出错:', error);
         this.$message.error('生成失败，请检查网络连接或服务器状态');
+      } finally {
+        this.isLoading = false; // <--- 在请求结束后（无论成功或失败），设置isLoading为false
       }
     },
     async fetchProcessedFiles() {
@@ -354,7 +330,6 @@ export default {
         this.processedFiles = [];
       }
     },
-        // 新增：格式化文件大小
     formatFileSize(bytes) {
       if (bytes === 0) return '0 B';
       const k = 1024;
@@ -367,12 +342,10 @@ export default {
     this.timer = setInterval(() => {
       this.currentTime = new Date().toLocaleTimeString();
     }, 1000);
-    // 新增：加载模型/api信息
     const savedModelApiInfo = localStorage.getItem('currentModelApiInfo');
     if (savedModelApiInfo) {
       this.currentModelApiInfo = savedModelApiInfo;
     }
-    // 新增：加载已处理的json文件列表
     this.fetchProcessedFiles();
   },
   beforeUnmount() {
@@ -432,18 +405,42 @@ export default {
 
 .top-section {
   display: flex;
+  flex-direction: row;
   justify-content: space-between;
-  gap: 30px;
+  gap: 8px;
   margin-bottom: 30px;
 }
-
 .upload-info-section {
-  flex-basis: 35%;
+  flex-basis: 38%;
+  min-width: 400px;
+  max-width: 560px;
   border: 1px solid #e0e0e0;
   padding: 20px;
   border-radius: 8px;
   background-color: #fdfdff;
 }
+.file-details-section {
+ flex-basis: 38%;
+  min-width: 400px;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+}
+
+
+.config-section-vertical {
+   flex-basis: 20%;
+  min-width: 180px;
+  max-width: 260px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  margin-top: 0;
+}
+
 .upload-header {
   display: flex;
   align-items: center;

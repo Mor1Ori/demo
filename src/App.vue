@@ -4,12 +4,6 @@
     <!-- 左侧导航栏 -->
     <el-aside width="220px" style="background-color: #2D3A4B; color: white; z-index: 2;">
 
-    <!--
-      <div style="padding: 20px; text-align: center;">
-        <img src="/logo.png" alt="Logo" class="image">
-        <h1 style="color: #fff; font-size: 30px;"> FinIntel系统</h1>
-      </div>
-    -->
       <el-menu :default-active="activeMenu" router @select="handleMenuSelect">
        
         <el-menu-item index="/chat" class="menu-item">
@@ -23,22 +17,13 @@
           <span>RAG 模块管理</span>
         </el-menu-item>
 
-       
-
-        <!-- <el-menu-item index="/home" class="menu-item">
-          <el-icon><UploadFilled /></el-icon>
-          <span>数据转化</span>
-        </el-menu-item> -->
-
-        <!-- 新增：JSON数据条目生成 入口 -->
         <el-menu-item index="/json-generation" class="menu-item">
-          <el-icon><Tickets /></el-icon> <!-- 使用一个合适的图标 -->
+          <el-icon><Tickets /></el-icon>
           <span>JSON条目生成</span>
         </el-menu-item>
 
-        <!-- 新增：数据预集成与操作 入口 -->
         <el-menu-item index="/data-integration" class="menu-item">
-          <el-icon><Operation /></el-icon> <!-- 使用一个合适的图标 -->
+          <el-icon><Operation /></el-icon>
           <span>数据集预览与操作</span>
         </el-menu-item>
       
@@ -60,7 +45,7 @@ import { UploadFilled, Document, ChatDotRound, Operation, Tickets } from '@eleme
 import axios from 'axios'; // 引入axios
 
 // 后端API根地址
-const API_BASE_URL = 'http://localhost:5000'; // <<--- 修改为你后端API的实际地址
+const API_BASE_URL = 'http://localhost:5000';
 
 export default {
   name: 'App',
