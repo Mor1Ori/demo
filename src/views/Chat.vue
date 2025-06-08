@@ -3,7 +3,6 @@
     <div class="floating-particles"></div>
     <div class="rainbow-stripes"></div>
 
-    <!-- Top Bar: Title, Model Info, Icons -->
     <div class="top-bar">
       <h1 class="page-title">🤖 智能问答</h1>
       <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
@@ -29,7 +28,6 @@
     </div>
 
     <div class="chat-main-layout">
-      <!-- 左侧对话记录栏 -->
       <div class="conversation-sidebar">
         <div class="sidebar-header">
           <h3>🗨️ 对话记录</h3>
@@ -58,17 +56,24 @@
         </div>
       </div>
 
-      <!-- 中间聊天框 -->
       <div class="chat-area">
         <div class="chat-window-wrapper">
           <div class="chat-window" ref="chatWindow">
-            <div v-if="!activeConversationMessages || activeConversationMessages.length === 0" class="empty-chat-placeholder">
-            </div>
+            <div v-if="!activeConversationMessages || activeConversationMessages.length === 0 && !isAiResponding" class="empty-chat-placeholder">
+               </div>
             <div v-for="message in activeConversationMessages" :key="message.id" :class="message.sender === 'user' ? 'user-message' : 'ai-message'">
               <div class="message-bubble">
                 <span v-if="message.sender === 'ai'" class="sender-avatar">AI</span>
                 <span v-if="message.sender === 'user'" class="sender-avatar">You</span>
-                <div class="message-text">{{ message.text }}</div>
+                <div class="message-text" v-html="renderMessageText(message.text)"></div>
+              </div>
+            </div>
+            <div v-if="isAiResponding" class="ai-responding-indicator">
+              <div class="message-bubble ai-message"> <span class="sender-avatar">AI</span>
+                <div class="message-text">
+                  <span class="ai-thinking-spinner"></span>
+                  正在思考中...
+                </div>
               </div>
             </div>
           </div>
@@ -83,8 +88,8 @@
             resize="none"
             class="chat-input-field"
           />
-          <el-button @click="sendMessage" type="primary" class="send-button" :disabled="!userInput.trim()">
-            <el-icon><Promotion /></el-icon> 发送
+          <el-button @click="sendMessage" type="primary" class="send-button" :disabled="!userInput.trim() || isAiResponding">
+            <el-icon><Promotion /></el-icon>&nbsp;发送
           </el-button>
         </div>
         <div class="bottom-controls">
@@ -102,7 +107,6 @@
         </div>
       </div>
 
-      <!-- 右侧配置面板 -->
       <div class="config-panel">
         <el-card shadow="never" class="config-card">
           <template #header><div>模型与API配置</div></template>
@@ -128,7 +132,7 @@
           </div>
         </el-card>
         <el-card shadow="never" class="config-card">
-           <template #header><div>对话操作</div></template>
+            <template #header><div>对话操作</div></template>
           <el-button type="warning" @click="exportConversationHistory" style="width:100%;" class="config-button">
             导出对话历史为JSON
           </el-button>
@@ -164,6 +168,7 @@ export default {
       showModelThinking: false,
       showRagReference: false,
       isModelApiLoading: false,
+      isAiResponding: false, // <-- 新增：AI是否正在回复的状态
     };
   },
   computed: {
@@ -175,6 +180,16 @@ export default {
     }
   },
   methods: {
+    // 美化AI消息内容：分段高亮、加粗、换行
+    renderMessageText(text) {
+      if (!text) return '';
+      // 1. 替换【xxx】为加粗蓝色分段标题
+      let html = text.replace(/(【[^】]+】)/g, '<span class="msg-section-title">$1</span>');
+      // 2. 换行
+      html = html.replace(/\r?\n/g, '<br>');
+      return html;
+    },
+
     // Utility to generate UUID for temporary chatId
     generateUUID() {
       return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -186,7 +201,7 @@ export default {
 
     // Fetch conversation list (3.1: GET /chat)
     async fetchConversations() {
-      currentModelApiInfo="";
+      this.currentModelApiInfo="";
       try {
         const response = await axios.get(`${API_BASE_URL}/chat`);
         const { success, chats } = response.data;
@@ -204,7 +219,7 @@ export default {
         if (this.conversations.length > 0) {
           this.activeConversationIndex = 0;
           // 批量获取所有历史消息
-          await Promise.all(this.conversations.map((_, idx) => this.fetchMessagesForConversation(idx)));
+          await Promise.all(this.conversations.map((_, idx) => this.fetchMessagesForConversation(idx, false))); // Pass false to avoid showing success message for each
         } else {
           this.activeConversationIndex = -1;
         }
@@ -218,7 +233,7 @@ export default {
           if (this.conversations.length > 0) {
             this.activeConversationIndex = 0;
             // 批量获取所有历史消息（本地恢复时也一致）
-            await Promise.all(this.conversations.map((_, idx) => this.fetchMessagesForConversation(idx)));
+            await Promise.all(this.conversations.map((_, idx) => this.fetchMessagesForConversation(idx, false))); // Pass false for initial load
           }
         } else {
           this.conversations = [];
@@ -228,12 +243,20 @@ export default {
     },
 
     // Fetch conversation history (3.4: GET /chat/history)
-    async fetchMessagesForConversation(convIndex) {
+    async fetchMessagesForConversation(convIndex, showSuccessMessage = true) {
       if (convIndex < 0 || !this.conversations[convIndex]) return;
       // 切换高亮
       this.activeConversationIndex = convIndex;
       try {
         const conv = this.conversations[convIndex];
+        // 如果消息已经加载过，就不重复加载 (除非强制)
+        // 这个判断可以根据实际需求调整，例如如果担心数据不同步，可以去掉
+        // if (conv.messages && conv.messages.length > 0 && !forceReload) {
+        //   if (showSuccessMessage) ElMessage.success(`已切换到对话 "${conv.name}"`);
+        //   this.scrollToBottom();
+        //   return;
+        // }
+
         const response = await axios.get(`${API_BASE_URL}/chat/history`, {
           params: {
             chatId: conv.id,
@@ -262,11 +285,16 @@ export default {
         ]);
 
         this.saveConversationsToStorage();
-        ElMessage.success(`已加载对话 "${conv.name}" 的历史消息`);
+        if (showSuccessMessage) {
+            ElMessage.success(`已加载对话 "${conv.name}" 的历史消息`);
+        }
         this.scrollToBottom();
       } catch (error) {
         ElMessage.error(`加载对话历史失败: ${error.message}`);
-        this.conversations[convIndex].messages = [];
+        // 即使加载失败，也尝试清空旧消息，避免显示不一致的内容
+        if (this.conversations[convIndex]) {
+            this.conversations[convIndex].messages = [];
+        }
       }
     },
 
@@ -281,20 +309,20 @@ export default {
         });
 
         const newConvTitle = value.trim();
-        const tempChatId = this.generateUUID();
+        const tempChatId = this.generateUUID(); // 生成临时ID，后端会返回真实的
 
         const response = await axios.post(`${API_BASE_URL}/chat/create`, {
-          chatId: tempChatId,
+          chatId: tempChatId, // 可以发送一个预期的ID，但后端应以其生成的为准
           title: newConvTitle
         });
 
-        const { success, chatId, message } = response.data;
+        const { success, chatId, message } = response.data; // chatId 是后端返回的
         if (!success) {
           throw new Error(message || '创建对话失败');
         }
 
         const newConv = {
-          id: chatId,
+          id: chatId, // 使用后端返回的 chatId
           name: newConvTitle,
           messages: []
         };
@@ -306,8 +334,8 @@ export default {
         this.userInput = '';
         this.scrollToBottom();
       } catch (error) {
-        if (error !== 'cancel') {
-          ElMessage.error(`创建对话失败: ${error.message}`);
+        if (error !== 'cancel') { // ElMessageBox的取消会抛出 'cancel'
+          ElMessage.error(`创建对话失败: ${error.message || error}`);
         }
       }
     },
@@ -357,9 +385,9 @@ export default {
         });
 
         const response = await axios.delete(`${API_BASE_URL}/chat/delete`, {
-          data: {
+          data: { // DELETE 请求的 body 通常在 data 属性中
             chatId: conversation.id,
-            title: conversation.name
+            title: conversation.name // title 可能不是必须的，取决于后端API设计
           }
         });
 
@@ -370,12 +398,16 @@ export default {
 
         this.conversations.splice(index, 1);
         if (this.activeConversationIndex === index) {
+          // 如果删除的是当前活动对话，切换到第一个或设为无活动对话
           this.activeConversationIndex = this.conversations.length > 0 ? 0 : -1;
           if (this.activeConversationIndex !== -1) {
-            await this.fetchMessagesForConversation(this.activeConversationIndex);
+            await this.fetchMessagesForConversation(this.activeConversationIndex, false);
+          } else {
+             // 如果没有对话了，清空消息区域
+             // this.activeConversationMessages 依赖于 activeConversationIndex，会自动更新
           }
         } else if (this.activeConversationIndex > index) {
-          this.activeConversationIndex--;
+          this.activeConversationIndex--; // 如果删除的是活动对话之前的，索引减一
         }
 
         this.saveConversationsToStorage();
@@ -389,9 +421,16 @@ export default {
 
     // Send message (3.7: POST /chat/send)
     async sendMessage() {
-      if (!this.userInput.trim() || this.activeConversationIndex < 0) {
-        ElMessage.warning('请先选择一个对话或输入消息');
+      if (!this.userInput.trim()) { // 修正：即使activeConversationIndex >=0，消息也不能为空
+        ElMessage.warning('请输入消息');
         return;
+      }
+      if (this.activeConversationIndex < 0) {
+        ElMessage.warning('请先选择或创建一个对话');
+        return;
+      }
+      if (this.isAiResponding) { // 防止在AI响应期间重复发送
+          return;
       }
 
       const userMessageText = this.userInput.trim();
@@ -404,8 +443,10 @@ export default {
         timestamp: new Date().toISOString()
       };
       currentConv.messages.push(userMessage);
-      this.userInput = '';
-      this.scrollToBottom();
+      this.userInput = ''; // 清空输入框
+      this.scrollToBottom(); // 滚动到底部显示用户消息
+
+      this.isAiResponding = true; // <-- 设置AI开始响应状态
 
       try {
         const response = await axios.post(`${API_BASE_URL}/chat/send`, {
@@ -419,10 +460,9 @@ export default {
 
         const { success, response: aiResponseText, think, sources } = response.data;
         if (!success) {
-          throw new Error('消息发送失败');
+          throw new Error(response.data.message || '消息发送失败，但AI未返回错误详情');
         }
 
-        // 处理换行，将\n或\r\n替换为<br>
         function formatWithBr(str) {
           if (!str) return '';
           return String(str).replace(/\r?\n/g, '<br>');
@@ -431,7 +471,6 @@ export default {
         const aiMessage = {
           id: `msg_${Date.now()}_ai`,
           sender: 'ai',
-          // 用v-html渲染时，内容中换行转为<br>
           text:
             (this.showModelThinking && think ? `【模型思考】${formatWithBr(think)}<br>` : '') +
             `【回答内容】${formatWithBr(aiResponseText)}` +
@@ -446,9 +485,11 @@ export default {
         this.scrollToBottom();
       } catch (error) {
         ElMessage.error(`消息发送失败: ${error.message}`);
-        // Remove the user message if the API call fails
-        currentConv.messages.pop();
-        this.scrollToBottom();
+        // 可选：如果API调用失败，从界面移除刚才发送的用户消息
+        // currentConv.messages.pop();
+        // this.scrollToBottom();
+      } finally {
+        this.isAiResponding = false; // <-- 设置AI响应结束状态 (无论成功或失败)
       }
     },
 
@@ -462,8 +503,8 @@ export default {
       try {
         const response = await axios.post(`${API_BASE_URL}/chat/load_model`, {
           model_type: 'ollama',
-          model_name: this.selectedRemoteModel, 
-          model_path: '',
+          model_name: this.selectedRemoteModel,
+          model_path: '', // For ollama, path might not be needed if model is already pulled
           api: ''
         });
         const { success, message } = response.data;
@@ -475,6 +516,8 @@ export default {
         ElMessage.success('模型加载成功!');
       } catch (error) {
         ElMessage.error(`模型加载失败: ${error.message}`);
+        // 如果加载失败，清除显示信息
+        // this.currentModelApiInfo = localStorage.getItem('currentModelApiInfo') || '未加载';
       } finally {
         this.isModelApiLoading = false;
       }
@@ -490,7 +533,7 @@ export default {
       try {
         const response = await axios.post(`${API_BASE_URL}/chat/load_model`, {
           model_type: 'api',
-          model_name: '',
+          model_name: '', // API mode might not need a model name
           model_path: '',
           api: this.apiEndpoint
         });
@@ -510,58 +553,71 @@ export default {
 
     // Load local safetensors model (3.6: POST /chat/load_model with model_type: safetensors)
     async selectLocalModelPath() {
-      // 打开文件夹选择框
       try {
-        // 仅支持 Electron/桌面端或通过 input[type=file] 变通实现
         const input = document.createElement('input');
         input.type = 'file';
+        // HTML标准不支持直接选择文件夹，但 webkitdirectory 是一个广泛支持的 hack
         input.webkitdirectory = true;
-        input.directory = true;
+        input.directory = true; // For wider compatibility, though webkitdirectory is key
         input.style.display = 'none';
         document.body.appendChild(input);
-        input.click();
+
         input.onchange = async (event) => {
+          document.body.removeChild(input); // Clean up input element
           const files = event.target.files;
           if (!files || files.length === 0) {
             ElMessage.warning('未选择任何文件夹');
-            document.body.removeChild(input);
             return;
           }
-          // 获取文件夹路径（取第一个文件的路径的上级目录）
-          const firstFile = files[0];
-          let folderPath = '';
-          if (firstFile.webkitRelativePath) {
-            folderPath = firstFile.webkitRelativePath.split('/')[0];
-          } else {
-            folderPath = firstFile.name;
-          }
-          this.localModelPath = folderPath;
-          document.body.removeChild(input);
 
-          // 选择后自动加载模型
+          // 通常，我们只需要文件夹的路径。
+          // 对于 `webkitdirectory`，`files[0].webkitRelativePath` 会给出类似 "folderName/fileName.txt" 的路径
+          // 我们需要提取 "folderName"
+          let folderPath = '';
+          if (files[0].webkitRelativePath) {
+            folderPath = files[0].webkitRelativePath.split('/')[0];
+          } else {
+            // 回退方案，如果 webkitRelativePath 不可用（不太可能在支持 webkitdirectory 的浏览器中）
+            // 这种情况下，可能需要用户输入或更复杂的处理，这里简单地用第一个文件名（如果有）
+            // 实际上，后端可能需要处理的是文件的上传和服务器端的路径。
+            // 为了简化前端，我们假设后端能够通过某种方式识别这个 "路径"
+            // 或者，如果API期望的是一个标识符，那么这里可能需要其他逻辑。
+            // 鉴于API参数是 model_path，这里我们尝试传递文件夹名。
+            ElMessage.info('尝试从选择的文件推断文件夹路径。这可能不总是准确。');
+            folderPath = files[0].name; // 这只是一个示例，实际情况可能更复杂
+          }
+
+          this.localModelPath = folderPath; // 显示选择的（推断的）文件夹名
+
           this.isModelApiLoading = true;
           try {
             const response = await axios.post(`${API_BASE_URL}/chat/load_model`, {
               model_type: 'safetensors',
-              model_name: '',
-              model_path: this.localModelPath,
+              model_name: '', // For local files, name might be derived from path or not needed
+              model_path: this.localModelPath, // 发送文件夹路径
               api: ''
             });
-            const { success, message } = response.data;
+            const { success, message, model_name_returned } = response.data; // 假设后端可能返回实际加载的模型名
             if (!success) {
               throw new Error(message || '本地模型加载失败');
             }
-            this.currentModelApiInfo = `本地模型: ${this.localModelPath} (已加载)`;
+            const loadedName = model_name_returned || this.localModelPath;
+            this.currentModelApiInfo = `本地模型: ${loadedName} (已加载)`;
             localStorage.setItem('currentModelApiInfo', this.currentModelApiInfo);
-            ElMessage.success('本地模型加载成功!');
-          } catch (error) {
-            ElMessage.error(`本地模型加载失败: ${error.message}`);
+            ElMessage.success(`本地模型 "${loadedName}" 加载成功!`);
+          } catch (loadError) {
+            ElMessage.error(`本地模型加载失败: ${loadError.message}`);
+            this.localModelPath = ''; // 加载失败则清空路径显示
           } finally {
             this.isModelApiLoading = false;
           }
         };
+        input.click();
       } catch (error) {
-        ElMessage.error(`文件夹选择失败: ${error.message}`);
+        ElMessage.error(`文件夹选择器出错: ${error.message}`);
+        if (document.querySelector("input[type='file'][webkitdirectory]")) {
+            document.body.removeChild(document.querySelector("input[type='file'][webkitdirectory]"));
+        }
       }
     },
 
@@ -573,16 +629,15 @@ export default {
       }
       const conversationToExp = this.conversations[this.activeConversationIndex];
       try {
-        // 先请求后端获取标准 history
         const response = await axios.get(`${API_BASE_URL}/chat/history`, {
           params: {
             chatId: conversationToExp.id,
-            title: conversationToExp.name
+            title: conversationToExp.name // title 可能不是必须的
           }
         });
         const { success, history } = response.data;
-        if (!success) throw new Error('获取对话历史失败');
-        // 导出为标准 QA 结构
+        if (!success) throw new Error(response.data.message ||'获取对话历史用于导出失败');
+
         const qaArray = history.map(item => ({
           id: item.id,
           question: item.question,
@@ -605,7 +660,6 @@ export default {
       }
     },
 
-    // Scroll to bottom of chat window
     scrollToBottom() {
       this.$nextTick(() => {
         const chatWindow = this.$refs.chatWindow;
@@ -615,25 +669,26 @@ export default {
       });
     },
 
-    // Save conversations to local storage
     saveConversationsToStorage() {
-      localStorage.setItem('chat_conversations_v2', JSON.stringify(this.conversations));
+      // 只存储对话列表的ID和名称，消息通过API获取
+      const convsToStore = this.conversations.map(c => ({ id: c.id, name: c.name }));
+      localStorage.setItem('chat_conversations_v2', JSON.stringify(convsToStore));
     },
 
-    // Navigation methods
     refreshPage() { location.reload(); },
     goHome() { this.$router.push('/'); }
   },
   mounted() {
-    // 页面首次打开时，只有本地存储有currentModelApiInfo才恢复（且需非空），否则显示未加载
     const savedModelApiInfo = localStorage.getItem('currentModelApiInfo');
     if (savedModelApiInfo && savedModelApiInfo !== '未加载') {
       this.currentModelApiInfo = savedModelApiInfo;
     } else {
-      this.currentModelApiInfo = '';
+      this.currentModelApiInfo = ''; // 或者 '未加载'
     }
-    this.isModelApiLoading = false;
-    this.fetchConversations();
+    this.isModelApiLoading = false; // 确保初始状态正确
+
+    this.fetchConversations(); // 获取对话列表
+
     this.timerInterval = setInterval(() => {
       this.currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     }, 1000);
@@ -645,6 +700,8 @@ export default {
 </script>
 
 <style scoped>
+/* ... (之前的样式保持不变) ... */
+
 .message-think {
   font-size: 12px;
   color: #555;
@@ -860,7 +917,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 15px;
-  overflow-y: hidden; /* Allow scrolling if content overflows */
+  overflow-y: auto; /* Changed to auto to allow scrolling if content overflows */
 }
 .config-card {
   border: 1px solid #e0e0e0;
@@ -894,7 +951,7 @@ export default {
   display: inline-block;
 }
 
-.model-api-loading-spinner {
+.model-api-loading-spinner { /* Spinner for model/API loading */
   display: inline-block;
   width: 22px;
   height: 22px;
@@ -904,9 +961,53 @@ export default {
   animation: spin 1s linear infinite;
   margin-right: 2px;
 }
+/* Keyframes for the spin animation (used by both spinners) */
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* AI Responding Indicator Styles */
+.ai-responding-indicator {
+  display: flex;
+  justify-content: flex-start; /* Align like AI messages */
+  margin-bottom: 12px;
+  font-size: 15px;
+}
+
+.ai-responding-indicator .message-bubble {
+  background-color: #E9EEF4; /* Match AI message bubble background */
+  color: #2D3748; /* Match AI message text color */
+  /* padding: 10px 15px; already inherited or set */
+  /* border-radius: 18px; already inherited or set */
+  /* max-width: 75%; already inherited or set */
+  /* box-shadow: 0 1px 3px rgba(0,0,0,0.1); already inherited or set */
+  display: flex; /* Override flex-direction: column if inherited */
+  flex-direction: row; /* Ensure avatar and text are side-by-side for this indicator */
+  align-items: center; /* Vertically align items in the bubble */
+}
+
+.ai-responding-indicator .sender-avatar {
+  /* font-size: 0.75em; */ /* Inherited */
+  /* color: #718096; */ /* Inherited */
+  margin-bottom: 0; /* Remove bottom margin if avatar is side-by-side with text */
+  margin-right: 8px; /* Space between avatar and spinner/text */
+}
+
+.ai-responding-indicator .message-text {
+  display: flex;
+  align-items: center; /* Vertically align spinner and text */
+}
+
+.ai-thinking-spinner {
+  display: inline-block;
+  width: 18px;   /* Slightly smaller spinner for message line */
+  height: 18px;
+  border: 2px solid rgba(45, 55, 72, 0.2); /* Lighter border color */
+  border-top: 2px solid #2D3748; /* Darker spinning part, matches AI text */
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite; /* Use the same spin animation */
+  margin-right: 8px; /* Space between spinner and "正在思考中..." text */
 }
 
 /* Floating particles and rainbow stripes (same as before, ensure z-index is low) */
@@ -919,4 +1020,11 @@ export default {
 .floating-particles::after { width: 15px; height: 15px; background-color: #9f7aea; animation-duration: 6s; animation-delay: 2s; }
 .rainbow-stripes { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(45deg, #f7d1d1, #f9e1b2, #f3f9b6, #d1f3e1, #b8d3f3, #d0bdf0, #f0b8f6); background-size: 400% 400%; animation: rainbowMove 10s linear infinite; pointer-events: none; z-index: -3; }
 @keyframes rainbowMove { 0% { background-position: 0% 0%; } 100% { background-position: 100% 100%; } }
+
+/* 分段标题样式 */
+.msg-section-title {
+  font-weight: bold;
+  color: #2563eb; /* Tailwind blue-600 like */
+  margin-right: 4px; /* Optional: space after title */
+}
 </style>

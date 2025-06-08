@@ -180,6 +180,7 @@ export default {
     };
   },
   computed: {
+     // 根据搜索关键词过滤向量文档
     filteredDocuments() {
       if (!this.searchQuery) {
         return this.documents;
@@ -188,6 +189,7 @@ export default {
         doc.name.toLowerCase().includes(this.searchQuery.toLowerCase())
       );
     },
+    // 当前页应该显示的文档子集（分页逻辑）
     paginatedDocuments() {
       const start = (this.currentPage - 1) * this.itemsPerPage;
       const end = start + this.itemsPerPage;
@@ -205,11 +207,7 @@ export default {
     refreshPage() {
       location.reload();
     },
-    goHome() {
-      // Assuming you have a router setup
-      // this.$router.push('/');
-      ElMessage.info('返回首页功能待实现');
-    },
+
     handleFileUpload(uploadFile, type) {
         if (!uploadFile || !uploadFile.raw) {
             ElMessage.error('无效的文件对象');
@@ -223,11 +221,7 @@ export default {
     handleDatabaseUpload(uploadFile) {
         this.handleFileUpload(uploadFile, 'database');
     },
-    uploadFolder() {
-      ElMessage.info('上传整个文件夹功能待实现');
-      // For actual implementation:
-      // this.$refs.folderUploadInput.click(); // Trigger hidden input
-    },
+
     // handleFolderFiles(event) {
     //   const files = event.target.files;
     //   // Process folder files
@@ -368,9 +362,9 @@ export default {
         ElMessage.error('获取RAG文档列表失败: ' + error.message);
       }
     },
-    // 获取数据库表信息（改为从 /rag-management 获取 json 数据）
+    // 获取数据库表信息（从 /rag-management 获取 json 数据）
     async fetchDatabaseTables() {
-      // 不再切换 showVectorFiles，只负责 recentTables 赋值
+      // 负责 recentTables 赋值
       try {
         const response = await axios.get(`${API_BASE_URL}/rag-management`);
         const data = response.data;
@@ -460,19 +454,6 @@ export default {
       }
     },
 
-    // // 查看数据库文件（2.4）
-    // async fetchDatabaseTables() {
-    //   try {
-    //     const response = await axios.get(`${API_BASE_URL}/rag-management`);
-    //     const data = response.data;
-    //     this.databaseStats.totalTables = data.table_count;
-    //     // recent_tables 可用于表格展示
-    //     // data.recent_tables
-    //   } catch (error) {
-    //     ElMessage.error('获取数据库表失败: ' + error.message);
-    //   }
-    // },
-
     // 上传单个文本文件（2.6）
     async uploadSingleDocument() {
       const input = document.createElement('input');
@@ -483,7 +464,7 @@ export default {
         if (!file) return;
         // 只取文件名+后缀
         const fileName = file.name;
-        // 不再弹窗，force_reprocess 默认 false
+        // force_reprocess 默认 false
         const forceReprocess = false;
         this.isLoadingTable = true;
         const loadingInstance = this.$loading ? this.$loading({ text: '正在上传文件...' }) : ElLoading.service({ text: '正在上传文件...' });
@@ -761,7 +742,6 @@ export default {
     getColWidth(index, total) {
       // 动态分配列宽，保证表格占满整行
       // index: 当前列索引，total: 总列数
-      // 例如5列，每列平均分配20%，最后一列略宽
       if (index === total - 1) return `${Math.round(100 / total) + 5}%`;
       return `${Math.floor(100 / total)}%`;
     },

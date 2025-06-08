@@ -39,7 +39,7 @@
         <!-- 新增：数据预集成与操作 入口 -->
         <el-menu-item index="/data-integration" class="menu-item">
           <el-icon><Operation /></el-icon> <!-- 使用一个合适的图标 -->
-          <span>数据集预览与操作</span>
+          <span>数据集预览</span>
         </el-menu-item>
       
 
